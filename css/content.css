@@ -87,10 +87,3 @@ html[hide_sidebar_recommendations=true][is_playlist=true] #secondary-inner > *:n
 html[hide_sidebar_recommendations=true][is_playlist=false] #secondary.ytd-watch-flexy {
     display: none !important;
 }
-
-/* Hide blocked channels */
-html[block_channels="true"] ytd-video-renderer[block_channel="true"],
-html[block_channels="true"] yt-lockup-view-model[block_channel="true"],
-html[block_channels="true"] ytd-rich-item-renderer[block_channel="true"] {
-    display: none !important;
-}

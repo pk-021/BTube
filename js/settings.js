@@ -22,14 +22,12 @@ function applyDarkMode() {
 }
 
 
-
 // Mapping HTML checkbox IDs -> Storage keys
 const settingsMap = {
     "extension-online": "BTubeOn",
     "redirect-subscriptions": "redirect_home",
     "disable-shorts": "hide_shorts",
-    "minimal-homepage": "minimal_homepage",
-    "block-channels": "block_channels"
+    "minimal-homepage": "minimal_homepage"
 };
 
 
@@ -58,8 +56,7 @@ function initSettingsToggles() {
                     "extension-online": "Extension",
                     "redirect-subscriptions": "Redirect to Subscriptions",
                     "disable-shorts": "Disable Shorts",
-                    "minimal-homepage": "Minimal Homepage",
-                    "block-channels": "Block Channels"
+                    "minimal-homepage": "Minimal Homepage"
                 };
                 // Do not notify for dark mode
                 if (settingNames.hasOwnProperty(checkboxId)) {

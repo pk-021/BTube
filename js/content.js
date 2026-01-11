@@ -127,150 +127,12 @@ function applyAttributes(settings) {
             key.includes("hide") ||
             key === "BTubeOn" ||
             key === "minimal_homepage" ||
-            key === "redirect_home" ||
-            key === "block_channels"
+            key === "redirect_home"
         ) {
             document.documentElement.setAttribute(key, settings[key]);
         }
     });
 }
-
-// Apply block_channel attribute to all video renderers based on blocked channels list
-let applyChannelAttributesTimeout = null;
-let retryQueue = new Set();
-
-function extractChannelInfo(renderer) {
-    let channelName = "";
-    let channelHandle = "";
-
-    const channelLink = renderer.querySelector("ytd-channel-name a");
-    if (channelLink && channelLink.textContent.trim()) {
-        channelName = channelLink.textContent.trim().toLowerCase();
-        const href = channelLink.getAttribute("href");
-        if (href) channelHandle = href.split("/").pop()?.toLowerCase() || "";
-        return { name: channelName, handle: channelHandle };
-    }
-
-    const handleLink = renderer.querySelector("a[href^='/@']");
-    if (handleLink && handleLink.textContent.trim()) {
-        channelName = handleLink.textContent.trim().toLowerCase();
-        const href = handleLink.getAttribute("href");
-        if (href) channelHandle = href.split("/").pop()?.toLowerCase() || "";
-        return { name: channelName, handle: channelHandle };
-    }
-
-    const metadataRow = renderer.querySelector("yt-content-metadata-view-model .yt-content-metadata-view-model__metadata-row");
-    if (metadataRow) {
-        const span = metadataRow.querySelector(".yt-core-attributed-string");
-        if (span) {
-            const textNode = Array.from(span.childNodes).find(n => n.nodeType === 3 && n.textContent && n.textContent.trim());
-            const baseText = (textNode ? textNode.textContent : span.textContent) || "";
-            channelName = baseText.trim().toLowerCase();
-            if (channelName) return { name: channelName, handle: channelHandle };
-        }
-    }
-
-    const anyText = renderer.querySelector(".yt-core-attributed-string");
-    if (anyText && anyText.textContent.trim()) {
-        channelName = anyText.textContent.trim().toLowerCase();
-    }
-    return { name: channelName, handle: channelHandle };
-}
-
-function applyChannelAttributes() {
-    if (!settingCache.block_channels) {
-        return;
-    }
-    
-    // Debounce rapid calls
-    if (applyChannelAttributesTimeout) {
-        clearTimeout(applyChannelAttributesTimeout);
-    }
-    
-    applyChannelAttributesTimeout = setTimeout(() => {
-        getSettings(settings => {
-            const blockedChannels = settings.blockedChannels || [];
-            const videoRenderers = document.querySelectorAll("ytd-video-renderer, yt-lockup-view-model, ytd-rich-item-renderer");
-            
-            if (videoRenderers.length === 0) {
-                return;
-            }
-            
-            let processedCount = 0;
-            let needsRetry = [];
-            
-            videoRenderers.forEach(renderer => {
-                // Skip if already in retry queue
-                if (retryQueue.has(renderer)) {
-                    return;
-                }
-                
-                const info = extractChannelInfo(renderer);
-                const channelName = info.name;
-                const channelHandle = info.handle;
-                
-                if (!channelName) {
-                    // Mark for retry
-                    needsRetry.push(renderer);
-                    renderer.setAttribute("block_channel", "false");
-                    return;
-                }
-                
-                // Check if this channel is in the blocked list (match by name or handle)
-                const isBlocked = blockedChannels.some(item => {
-                    if (!item.name) return false;
-                    const blockedName = item.name.toLowerCase();
-                    return blockedName === channelName || blockedName === channelHandle;
-                });
-                
-                renderer.setAttribute("block_channel", isBlocked ? "true" : "false");
-                processedCount++;
-                
-                // Remove from retry queue if it was there
-                retryQueue.delete(renderer);
-            });
-            
-            // Retry failed renderers
-            if (needsRetry.length > 0) {
-                console.log(`[block_channel] Scheduling retry for ${needsRetry.length} renderers with missing channel info`);
-                needsRetry.forEach(r => retryQueue.add(r));
-                
-                setTimeout(() => {
-                    retryQueue.forEach(renderer => {
-                        const info2 = extractChannelInfo(renderer);
-                        const channelName2 = info2.name;
-                        const channelHandle2 = info2.handle;
-
-                        if (channelName2) {
-                            const isBlocked = blockedChannels.some(item => {
-                                if (!item.name) return false;
-                                const blockedName = item.name.toLowerCase();
-                                return blockedName === channelName2 || blockedName === channelHandle2;
-                            });
-
-                            renderer.setAttribute("block_channel", isBlocked ? "true" : "false");
-                            retryQueue.delete(renderer);
-                        }
-                    });
-                }, 1000);
-            }
-            
-            console.log(`[block_channel] Attribute application check: Applied block_channel attribute to ${processedCount}/${videoRenderers.length} video renderers`);
-        }, ['blockedChannels']);
-    }, 100);
-}
-
-// Periodic check to ensure all renderers have the attribute
-setInterval(() => {
-    if (!settingCache.block_channels) return;
-    const videoRenderers = document.querySelectorAll("ytd-video-renderer:not([block_channel]), yt-lockup-view-model:not([block_channel]), ytd-rich-item-renderer:not([block_channel])");
-    if (videoRenderers.length > 0) {
-        console.log(`[block_channel] Found ${videoRenderers.length} video renderers without block_channel attribute, applying now...`);
-        applyChannelAttributes();
-    } else {
-        console.log('[block_channel] All video renderers have block_channel attribute.');
-    }
-}, 2000);
 
 //Mutation observer to observe changes to the attributes
 new MutationObserver((mutations) => {
@@ -281,37 +143,6 @@ new MutationObserver((mutations) => {
         }
     });
 }).observe(document.documentElement, { attributes: true });
-
-// Mutation observer to watch for new ytd-video-renderer elements
-const videoRendererObserver = new MutationObserver((mutations) => {
-    let hasNewRenderers = false;
-    for (const mutation of mutations) {
-        if (mutation.type === 'childList') {
-            mutation.addedNodes.forEach(node => {
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.matches && (node.matches('ytd-video-renderer') || node.matches('yt-lockup-view-model') || node.matches('ytd-rich-item-renderer'))) {
-                        hasNewRenderers = true;
-                    } else if (node.querySelector) {
-                        const renderers = node.querySelectorAll('ytd-video-renderer, yt-lockup-view-model, ytd-rich-item-renderer');
-                        if (renderers.length > 0) {
-                            hasNewRenderers = true;
-                        }
-                    }
-                }
-            });
-        }
-    }
-    if (hasNewRenderers) {
-        console.log('[block_channel] MutationObserver: New renderers detected, applying attributes');
-        applyChannelAttributes();
-    }
-});
-
-// Start observing the entire document body for ytd-video-renderer changes
-videoRendererObserver.observe(document.body, {
-    childList: true,
-    subtree: true
-});
 
 
 
@@ -325,7 +156,6 @@ function update(arg) {
             configureLogo();
             update_home_props();
             applyAttributes(settingCache);
-            applyChannelAttributes();
             loadBookmarkButton();
             break;
 
@@ -339,12 +169,10 @@ function update(arg) {
             configureLogo();
             update_home_props();
             update_playlist_props();
-            applyChannelAttributes();
             loadBookmarkButton();
             break;
 
         default: // yt-page-data-updated
-            applyChannelAttributes();
             break;
     }
 }

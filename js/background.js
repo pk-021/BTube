@@ -8,7 +8,6 @@ const modePresets = {
     hide_shorts: false,
     minimal_homepage: false,
     enable_website_blocking: false,
-    block_channels: false,
     hide_sidebar_recommendations: false
   },
   minimal: {
@@ -17,8 +16,7 @@ const modePresets = {
     hide_shorts: true,
     minimal_homepage: true,
     enable_website_blocking: true,
-    block_channels: true,
-    hide_sidebar_recommendations: false
+    hide_sidebar_recommendations: true
   },
   "high-focus": {
     BTubeOn: true,
@@ -26,7 +24,6 @@ const modePresets = {
     hide_shorts: true,
     minimal_homepage: true,
     enable_website_blocking: true,
-    block_channels: true,
     hide_sidebar_recommendations: true
   }
 };

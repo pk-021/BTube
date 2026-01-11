@@ -149,10 +149,6 @@ async function checkPassword() {
           toSet.blockedWebsites = pendingBlocks.blockedWebsites;
           hadChanges = true;
         }
-        if (Array.isArray(pendingBlocks.blockedChannels)) {
-          toSet.blockedChannels = pendingBlocks.blockedChannels;
-          hadChanges = true;
-        }
       }
 
       if (hadChanges) {

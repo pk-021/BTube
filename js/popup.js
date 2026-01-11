@@ -199,7 +199,6 @@ function closePopup() {
 const pendingChanges = {
     settings: null,
     blockedWebsites: null,
-    blockedChannels: null,
     hasSettingsChanges: false,
     hasBlockChanges: false,
     hasDeletions: false
@@ -212,7 +211,6 @@ function hasPendingChanges() {
 function clearPendingChanges() {
     pendingChanges.settings = null;
     pendingChanges.blockedWebsites = null;
-    pendingChanges.blockedChannels = null;
     pendingChanges.hasSettingsChanges = false;
     pendingChanges.hasBlockChanges = false;
     pendingChanges.hasDeletions = false;
@@ -335,7 +333,6 @@ const settingsMap = {
     "disable-shorts": "hide_shorts",
     "minimal-homepage": "minimal_homepage",
     "enable-website-blocking": "enable_website_blocking",
-    "block-channels": "block_channels",
     "hide-sidebar-recommendations": "hide_sidebar_recommendations"
 };
 
@@ -347,7 +344,6 @@ const modePresets = {
         hide_shorts: false,
         minimal_homepage: false,
         enable_website_blocking: false,
-        block_channels: false,
         hide_sidebar_recommendations: false
     },
     "minimal": {
@@ -356,8 +352,7 @@ const modePresets = {
         hide_shorts: true,
         minimal_homepage: true,
         enable_website_blocking: true,
-        block_channels: true,
-        hide_sidebar_recommendations: false
+        hide_sidebar_recommendations: true
     },
     "high-focus": {
         BTubeOn: true,
@@ -365,7 +360,6 @@ const modePresets = {
         hide_shorts: true,
         minimal_homepage: true,
         enable_website_blocking: true,
-        block_channels: true,
         hide_sidebar_recommendations: true
     }
 };
@@ -671,12 +665,6 @@ function initSettingsToggles() {
                         .map(({url, addedAt}) => ({url, addedAt}));
                     hasPendingBlocks = true;
                 }
-                if (pendingChanges.blockedChannels) {
-                    toSave.blockedChannels = pendingChanges.blockedChannels
-                        .filter(item => !item.isDeleted)
-                        .map(({name, addedAt}) => ({name, addedAt}));
-                    hasPendingBlocks = true;
-                }
             }
 
             if (requiresLogin) {
@@ -685,7 +673,7 @@ function initSettingsToggles() {
                 if (hasPendingSettings) {
                     const settingsOnly = {};
                     Object.entries(toSave).forEach(([key, val]) => {
-                        if (key !== 'blockedWebsites' && key !== 'blockedChannels') {
+                        if (key !== 'blockedWebsites') {
                             settingsOnly[key] = val;
                         }
                     });
@@ -701,9 +689,6 @@ function initSettingsToggles() {
                     pendingData.btube_pending_block_updates = {};
                     if (toSave.blockedWebsites) {
                         pendingData.btube_pending_block_updates.blockedWebsites = toSave.blockedWebsites;
-                    }
-                    if (toSave.blockedChannels) {
-                        pendingData.btube_pending_block_updates.blockedChannels = toSave.blockedChannels;
                     }
                     if (pendingChanges.hasDeletions) {
                         pendingData.btube_has_pending_block_deletions = true;
@@ -741,11 +726,9 @@ function initSettingsToggles() {
                 saveBtn.style.display = 'none';
 
                 // Reload blocked content from storage
-                const result = await chrome.storage.local.get(['blockedWebsites', 'blockedChannels']);
+                const result = await chrome.storage.local.get(['blockedWebsites']);
                 pendingChanges.blockedWebsites = (result.blockedWebsites || []).slice();
-                pendingChanges.blockedChannels = (result.blockedChannels || []).slice();
                 renderBlockedWebsites(pendingChanges.blockedWebsites);
-                renderBlockedChannels(pendingChanges.blockedChannels);
             }
         });
     }
@@ -758,11 +741,8 @@ function initBlockingTab() {
     const closeOverlayBtn = document.getElementById('close-overlay-btn');
     const cancelOverlayBtn = document.getElementById('cancel-overlay-btn');
     const saveOverlayBtn = document.getElementById('save-overlay-btn');
-    const typeRadios = document.querySelectorAll('input[name="block-type"]');
     const websiteInput = document.getElementById('website-input');
-    const channelInput = document.getElementById('channel-input');
     const websiteUrlField = document.getElementById('website-url');
-    const channelNameField = document.getElementById('channel-name');
     
     // Load blocked content when popup opens
     loadBlockedContent();
@@ -775,29 +755,10 @@ function initBlockingTab() {
         });
     }
 
-    // Handle type selection change
-    typeRadios.forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            if (e.target.value === 'website') {
-                websiteInput.hidden = false;
-                channelInput.hidden = true;
-                websiteUrlField.focus();
-            } else {
-                websiteInput.hidden = true;
-                channelInput.hidden = false;
-                channelNameField.focus();
-            }
-        });
-    });
-
     // Close overlay handlers
     const closeOverlay = () => {
         overlay.hidden = true;
         websiteUrlField.value = '';
-        channelNameField.value = '';
-        document.querySelector('input[name="block-type"][value="website"]').checked = true;
-        websiteInput.hidden = false;
-        channelInput.hidden = true;
     };
 
     if (closeOverlayBtn) {
@@ -811,23 +772,12 @@ function initBlockingTab() {
     // Save blocked content
     if (saveOverlayBtn) {
         saveOverlayBtn.addEventListener('click', async () => {
-            const blockType = document.querySelector('input[name="block-type"]:checked').value;
-            
-            if (blockType === 'website') {
-                const url = websiteUrlField.value.trim();
-                if (!url) {
-                    alert('Please enter a website URL');
-                    return;
-                }
-                await addBlockedWebsite(url);
-            } else {
-                const channelName = channelNameField.value.trim();
-                if (!channelName) {
-                    alert('Please enter a channel name or ID');
-                    return;
-                }
-                await addBlockedChannel(channelName);
+            const url = websiteUrlField.value.trim();
+            if (!url) {
+                alert('Please enter a website URL');
+                return;
             }
+            await addBlockedWebsite(url);
 
             closeOverlay();
         });
@@ -851,14 +801,6 @@ function initBlockingTab() {
         });
     }
 
-    if (channelNameField) {
-        channelNameField.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                saveOverlayBtn.click();
-            }
-        });
-    }
-
     // Close overlay when clicking outside
     if (overlay) {
         overlay.addEventListener('click', (e) => {
@@ -870,37 +812,25 @@ function initBlockingTab() {
 }
 
 // Add blocked website
-async function addBlockedWebsite(url) {
+async function addBlockedWebsite(rawUrl) {
     try {
-        // Process and extract essential part of URL
-        let processedUrl = url.trim();
-        
-        // Remove protocol if present
-        processedUrl = processedUrl.replace(/^https?:\/\//i, '');
-        
-        // Remove www. if present
-        processedUrl = processedUrl.replace(/^www\./i, '');
-        
-        // Remove trailing slashes
-        processedUrl = processedUrl.replace(/\/+$/, '');
-        
-        // Extract video ID if it's a YouTube video URL
-        // Handles: youtube.com/watch?v=VIDEO_ID, youtu.be/VIDEO_ID, youtube.com/embed/VIDEO_ID
-        const videoIdMatch = processedUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
-        if (videoIdMatch) {
-            // For YouTube videos, keep the full format
-            processedUrl = `youtube.com/watch?v=${videoIdMatch[1]}`;
-        } else {
-            // Extract domain and path (remove query params and fragments for general URLs)
-            processedUrl = processedUrl.split('?')[0].split('#')[0];
-            
-            // Remove domain extensions (.com, .org, .net, etc.) unless it's a path
-            if (!processedUrl.includes('/')) {
-                // Only remove extension if it's just a domain (no path)
-                processedUrl = processedUrl.replace(/\.(com|org|net|edu|gov|co|io|ai|me|tv|info|biz|dev|app|tech|online|site|xyz|store|shop|blog|news|pro|cloud|digital|web|us|uk|ca|au|de|fr|jp|in|br|ru|cn|kr|es|it|nl|se|pl|tr|mx|za|id|th|my|sg|ph|vn|tw|hk|nz|ar|cl|pe|eg|pk|bd|ng|ke|ua|ro|cz|gr|pt|be|hu|at|ch|dk|fi|no|ie|il|sa|ae|qa|kw|om|bh|lb|jo|iq|sy|ye|ly|tn|ma|dz|sd|so|et|ug|tz|gh|sn|ci|cm|bw|zm|zw|mw|mg|mu|re|mz|ao|na|ls|sz|gm|gn|gw|sl|lr|ml|bf|ne|td|cf|ga|cg|cd|rw|bi|dj|er|ss|st|cv|sc|km|mr|eh)$/i, '');
-            }
+        let processedUrl = (rawUrl || '').trim();
+        if (!processedUrl) {
+            alert('Please enter a valid URL');
+            return;
         }
 
+        // Strip protocol and www
+        processedUrl = processedUrl.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+        // Remove trailing slash
+        processedUrl = processedUrl.replace(/\/$/, '');
+
+        // If it's just a domain, optionally strip common TLDs to normalize
+        if (!processedUrl.includes('/')) {
+            processedUrl = processedUrl.replace(/\.(com|org|net|edu|gov|co|io|ai|me|tv|info|biz|dev|app|tech|online|site|xyz|store|shop|blog|news|pro|cloud|digital|web|us|uk|ca|au|de|fr|jp|in|br|ru|cn|kr|es|it|nl|se|pl|tr|mx|za|id|th|my|sg|ph|vn|tw|hk|nz|ar|cl|pe|eg|pk|bd|ng|ke|ua|ro|cz|gr|pt|be|hu|at|ch|dk|fi|no|ie|il|sa|ae|qa|kw|om|bh|lb|jo|iq|sy|ye|ly|tn|ma|dz|sd|so|et|ug|tz|gh|sn|ci|cm|bw|zm|zw|mw|mg|mu|re|mz|ao|na|ls|sz|gm|gn|gw|sl|lr|ml|bf|ne|td|cf|ga|cg|cd|rw|bi|dj|er|ss|st|cv|sc|km|mr|eh)$/i, '');
+        }
+
+        processedUrl = processedUrl.trim();
         if (!processedUrl) {
             alert('Please enter a valid URL');
             return;
@@ -941,107 +871,17 @@ async function addBlockedWebsite(url) {
     }
 }
 
-// Add blocked channel
-async function addBlockedChannel(channelName) {
-    try {
-        // Process and extract essential part of channel
-        let processedChannel = channelName.trim();
-        
-        // Handle full YouTube URLs
-        // Formats: youtube.com/@channelname, youtube.com/channel/UCxxxx, youtube.com/c/channelname
-        if (processedChannel.includes('youtube.com') || processedChannel.includes('youtu.be')) {
-            // Remove protocol and domain
-            processedChannel = processedChannel.replace(/^https?:\/\//i, '');
-            processedChannel = processedChannel.replace(/^(www\.)?youtube\.com\//i, '');
-            
-            // Extract channel handle (@name)
-            const handleMatch = processedChannel.match(/@([a-zA-Z0-9_.-]+)/);
-            if (handleMatch) {
-                processedChannel = '@' + handleMatch[1];
-            } 
-            // Extract channel ID (UC...)
-            else if (processedChannel.startsWith('channel/')) {
-                const channelId = processedChannel.replace('channel/', '').split('/')[0].split('?')[0];
-                processedChannel = channelId;
-            }
-            // Extract custom channel name (/c/...)
-            else if (processedChannel.startsWith('c/')) {
-                const customName = processedChannel.replace('c/', '').split('/')[0].split('?')[0];
-                processedChannel = customName;
-            }
-            // Extract user name (/user/...)
-            else if (processedChannel.startsWith('user/')) {
-                const userName = processedChannel.replace('user/', '').split('/')[0].split('?')[0];
-                processedChannel = userName;
-            }
-        }
-        // If it already starts with @, keep it as is
-        else if (!processedChannel.startsWith('@') && !processedChannel.startsWith('UC')) {
-            // Assume it's a handle without @ prefix, add it
-            processedChannel = '@' + processedChannel;
-        }
-        
-        // Remove any remaining query params or fragments
-        processedChannel = processedChannel.split('?')[0].split('#')[0];
-
-        if (!processedChannel || processedChannel === '@') {
-            alert('Please enter a valid channel name or ID');
-            return;
-        }
-
-        // Get current blocked channels from storage
-        const result = await chrome.storage.local.get(['blockedChannels']);
-        const blockedChannels = result.blockedChannels || [];
-
-        // Check if already blocked (case-insensitive)
-        if (blockedChannels.some(item => item.name.toLowerCase() === processedChannel.toLowerCase())) {
-            alert('This channel is already blocked');
-            return;
-        }
-
-        // Add and save immediately
-        blockedChannels.push({
-            name: processedChannel,
-            addedAt: Date.now()
-        });
-
-        await chrome.storage.local.set({ blockedChannels });
-
-        // Update pending changes to reflect current storage state
-        pendingChanges.blockedChannels = blockedChannels.slice();
-
-        // Re-render to show new item
-        renderBlockedChannels(pendingChanges.blockedChannels);
-
-        chrome.runtime.sendMessage({
-            type: 'showNotification',
-            message: 'Channel blocked successfully!',
-            notificationType: 'success'
-        });
-    } catch (error) {
-        console.error('Error adding blocked channel:', error);
-        alert('Failed to block channel. Please try again.');
-    }
-}
-
 // Load and display blocked websites and channels
 async function loadBlockedContent() {
     try {
         // Use pending changes if available, otherwise load from storage
-        if (pendingChanges.blockedWebsites === null || pendingChanges.blockedChannels === null) {
-            const result = await chrome.storage.local.get(['blockedWebsites', 'blockedChannels']);
-            
-            if (pendingChanges.blockedWebsites === null) {
-                pendingChanges.blockedWebsites = (result.blockedWebsites || []).slice();
-            }
-            if (pendingChanges.blockedChannels === null) {
-                pendingChanges.blockedChannels = (result.blockedChannels || []).slice();
-            }
+        if (pendingChanges.blockedWebsites === null) {
+            const result = await chrome.storage.local.get(['blockedWebsites']);
+            pendingChanges.blockedWebsites = (result.blockedWebsites || []).slice();
         }
 
         // Render using pending data
         renderBlockedWebsites(pendingChanges.blockedWebsites);
-        renderBlockedChannels(pendingChanges.blockedChannels);
     } catch (error) {
         console.error('Error loading blocked content:', error);
     }
@@ -1067,30 +907,6 @@ function renderBlockedWebsites(websites) {
         const item = createBlockedItem(website.url, () => {
             deleteBlockedWebsite(index);
         }, website.isPending, website.isDeleted);
-        listContainer.appendChild(item);
-    });
-}
-
-// Render blocked channels list
-function renderBlockedChannels(channels) {
-    const listContainer = document.getElementById('blocked-channels-list');
-    const emptyMessage = document.getElementById('empty-channels');
-    
-    if (!listContainer) return;
-
-    listContainer.innerHTML = '';
-
-    if (channels.length === 0) {
-        emptyMessage.hidden = false;
-        return;
-    }
-
-    emptyMessage.hidden = true;
-
-    channels.forEach((channel, index) => {
-        const item = createBlockedItem(channel.name, () => {
-            deleteBlockedChannel(index);
-        }, channel.isPending, channel.isDeleted);
         listContainer.appendChild(item);
     });
 }
@@ -1165,32 +981,6 @@ async function deleteBlockedWebsite(index) {
         updateSaveButtonVisibility();
     } catch (error) {
         console.error('Error deleting blocked website:', error);
-    }
-}
-
-// Delete blocked channel
-async function deleteBlockedChannel(index) {
-    try {
-        const item = pendingChanges.blockedChannels[index];
-        
-        if (item.isDeleted) {
-            // Undo deletion - restore the item
-            delete item.isDeleted;
-        } else {
-            // Mark existing item as deleted
-            item.isDeleted = true;
-            pendingChanges.hasDeletions = true;
-        }
-
-        pendingChanges.hasBlockChanges = true;
-
-        // Re-render to show updated state
-        renderBlockedChannels(pendingChanges.blockedChannels);
-
-        // Show save button
-        updateSaveButtonVisibility();
-    } catch (error) {
-        console.error('Error deleting blocked channel:', error);
     }
 }
 

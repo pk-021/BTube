@@ -143,14 +143,6 @@
             </div>
 
             <div class="setting-item">
-              <label for="enable-channel-blocking">Enable Channel Blocking</label>
-              <label class="switch">
-                <input type="checkbox" id="enable-channel-blocking" />
-                <span class="slider"></span>
-              </label>
-            </div>
-
-            <div class="setting-item">
               <label for="hide-sidebar-recommendations">Hide Sidebar Recommendations</label>
               <label class="switch">
                 <input type="checkbox" id="hide-sidebar-recommendations" />
@@ -173,17 +165,6 @@
             <p class="empty-message" id="empty-websites" hidden>No blocked websites yet</p>
           </div>
 
-          <!-- Blocked Channels Section -->
-          <div class="blocked-section">
-            <div class="section-header">
-              <h3>Blocked Channels</h3>
-              <span class="beta-label">BETA</span>
-            </div>
-            <div id="blocked-channels-list" class="blocked-list">
-              <!-- Blocked channels will be dynamically inserted here -->
-            </div>
-            <p class="empty-message" id="empty-channels" hidden>No blocked channels yet</p>
-          </div>
         </div>
       </section>
     </main>
@@ -227,17 +208,6 @@
       </div>
 
       <div class="overlay-body">
-        <div class="type-selector">
-          <label>
-            <input type="radio" name="block-type" value="website" checked />
-            <span>Website</span>
-          </label>
-          <label>
-            <input type="radio" name="block-type" value="channel" />
-            <span>Channel</span>
-          </label>
-        </div>
-
         <div class="input-section">
           <div id="website-input" class="input-group">
             <label for="website-url">Website URL</label>
@@ -248,17 +218,6 @@
               autocomplete="off"
             />
             <small>Enter the full URL or domain you want to block</small>
-          </div>
-
-          <div id="channel-input" class="input-group" hidden>
-            <label for="channel-name">Channel Name or ID</label>
-            <input 
-              type="text" 
-              id="channel-name" 
-              placeholder="e.g., @channelname or UCxxxxxxx" 
-              autocomplete="off"
-            />
-            <small>Enter the channel handle (@name) or channel ID</small>
           </div>
         </div>
 
