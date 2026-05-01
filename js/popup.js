@@ -13,6 +13,13 @@ function showNotification(message, type = 'info') {
 // --- Dark Mode Toggle ---
 const darkModeToggle = document.getElementById("darkModeToggle");
 
+function syncThemeToggleState() {
+    if (!darkModeToggle) return;
+    const isDark = document.documentElement.hasAttribute("dark_mode");
+    darkModeToggle.classList.toggle("is-dark", isDark);
+    darkModeToggle.setAttribute("aria-pressed", String(isDark));
+}
+
 // Load dark mode state on popup open
 chrome.storage.local.get("darkModeEnabled", (result) => {
     if (result.darkModeEnabled) {
@@ -20,6 +27,7 @@ chrome.storage.local.get("darkModeEnabled", (result) => {
     } else {
         document.documentElement.removeAttribute("dark_mode");
     }
+    syncThemeToggleState();
 });
 
 // Toggle dark mode on click
@@ -34,156 +42,12 @@ darkModeToggle.addEventListener("click", () => {
 
     // Save preference
     chrome.storage.local.set({ darkModeEnabled: !isDark });
+    syncThemeToggleState();
     
     // No notification for dark mode toggle
 });
 
 
-
-// Fetch bookmarks from storage
-function renderBookmarksFromStorage() {
-    chrome.storage.sync.get("bookmarks", (result) => {
-        const folders = result.bookmarks || [];
-        renderBookmarks(folders);
-    });
-}
-
-// Render all folders and bookmarks
-function renderBookmarks(folders) {
-    const container = document.querySelector(".folder");
-    if (!container) return;
-    container.innerHTML = "";
-
-    if (!folders || folders.length === 0) {
-        const noMsg = document.createElement("p");
-        noMsg.textContent = "No bookmarks";
-        noMsg.className = "no-bookmarks";
-        container.appendChild(noMsg);
-        return;
-    }
-
-    folders.forEach((folder, folderIndex) => {
-        const folderDiv = document.createElement("div");
-        folderDiv.className = "fold";
-
-        // --- Folder Header ---
-        const header = document.createElement("div");
-        header.className = "head collapsed";
-
-        const titleSpan = document.createElement("span");
-        titleSpan.className = "folder-title";
-        titleSpan.textContent = folder.folderName || "Untitled Folder";
-        header.appendChild(titleSpan);
-
-        const actions = document.createElement("div");
-        actions.className = "head-actions";
-
-        const chevron = document.createElement("span");
-        chevron.className = "chevron";
-
-        const deleteFolderBtn = document.createElement("span");
-        deleteFolderBtn.className = "delete-folder";
-        deleteFolderBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            chrome.storage.sync.get("bookmarks", (res) => {
-                const allFolders = res.bookmarks || [];
-                allFolders.splice(folderIndex, 1);
-                chrome.storage.sync.set({ bookmarks: allFolders }, () => {
-                    renderBookmarks(allFolders);
-                });
-            });
-        });
-
-        actions.appendChild(deleteFolderBtn);
-        actions.appendChild(chevron);
-        header.appendChild(actions);
-        folderDiv.appendChild(header);
-
-        // --- Folder Content ---
-        const content = document.createElement("div");
-        content.className = "content";
-
-        const bookmarks = Array.isArray(folder.bookmarks) ? folder.bookmarks : [];
-        if (bookmarks.length > 0) {
-            bookmarks.forEach((bm, bmIndex) => {
-                const bookmarkDiv = document.createElement("div");
-                bookmarkDiv.className = "bookmark";
-
-                // Make entire row clickable
-                bookmarkDiv.addEventListener("click", () => {
-                    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                        chrome.tabs.update(tabs[0].id, { url: bm.url });
-                    });
-                });
-
-                // Accessibility link
-                const link = document.createElement("a");
-                link.href = bm.url || "#";
-                link.textContent = bm.title || "Untitled";
-                link.className = "bookmark-link";
-                link.target = "_blank";
-                link.addEventListener("click", (e) => e.preventDefault()); // row handles click
-
-                // Right side (meta)
-                const rightDiv = document.createElement("div");
-                rightDiv.className = "bookmark-meta";
-
-                const timestampSpan = document.createElement("span");
-                timestampSpan.className = "timestamp";
-                timestampSpan.textContent = formatTimestamp(bm.timestamp);
-
-                const deleteText = document.createElement("span");
-                deleteText.textContent = "Delete";
-                deleteText.className = "delete-bookmark";
-
-                // Delete bookmark without triggering row click
-                deleteText.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-
-                    chrome.storage.sync.get("bookmarks", (res) => {
-                        const allFolders = res.bookmarks || [];
-                        if (allFolders[folderIndex] && Array.isArray(allFolders[folderIndex].bookmarks)) {
-                            allFolders[folderIndex].bookmarks.splice(bmIndex, 1);
-                            chrome.storage.sync.set({ bookmarks: allFolders }, () => {
-                                renderBookmarks(allFolders);
-                            });
-                        }
-                    });
-                });
-
-                rightDiv.appendChild(timestampSpan);
-                rightDiv.appendChild(deleteText);
-
-                bookmarkDiv.appendChild(link);
-                bookmarkDiv.appendChild(rightDiv);
-                content.appendChild(bookmarkDiv);
-            });
-        } else {
-            const noBm = document.createElement("p");
-            noBm.textContent = "No bookmarks in this folder";
-            noBm.className = "no-bookmarks";
-            content.appendChild(noBm);
-        }
-
-        folderDiv.appendChild(content);
-        container.appendChild(folderDiv);
-
-        // Toggle folder content
-        header.addEventListener("click", () => {
-            content.classList.toggle("open");
-            header.classList.toggle("collapsed");
-        });
-    });
-}
-
-// Format seconds into mm:ss
-function formatTimestamp(seconds) {
-    if (!seconds) return "0:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
 
 // Close popup with animation
 function closePopup() {
@@ -217,8 +81,6 @@ function clearPendingChanges() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-    renderBookmarksFromStorage();
-    
     // Test notification button (uncomment for testing)
     const testBtn = document.getElementById("test-notification");
     if (testBtn) {
@@ -245,7 +107,6 @@ window.addEventListener("DOMContentLoaded", () => {
     }, 50); // 50ms is usually enough
 
     // Tabs switching logic
-    const tabButtons = document.querySelectorAll('.tabbar .tab-btn');
     const tabViews = {
         home: document.getElementById('tab-home'),
         settings: document.getElementById('tab-settings'),
@@ -253,62 +114,123 @@ window.addEventListener("DOMContentLoaded", () => {
     };
     const addBlockBtn = document.getElementById('add-block-btn');
     const saveSettingsBtn = document.getElementById('save-settings-btn');
+    let activeTabName = 'home';
+    let isTabTransitioning = false;
 
-    // Function to switch tabs programmatically
-    function switchToTab(tabName) {
-        if (!tabViews[tabName]) return;
-
-        // Update views state
-        Object.entries(tabViews).forEach(([key, el]) => {
-            const show = key === tabName;
-            if (!el) return;
-            el.classList.toggle('active', show);
-            el.hidden = !show;
-        });
-
-        // Update buttons state
-        tabButtons.forEach(btn => {
-            const btnTab = btn.getAttribute('data-tab');
-            const isActive = btnTab === tabName;
-            btn.classList.toggle('active', isActive);
-            btn.setAttribute('aria-selected', String(isActive));
-        });
-
-        // Show/hide add block button based on active tab
+    function updateToolbarForTab(tabName) {
         if (addBlockBtn) {
             addBlockBtn.classList.toggle('is-hidden', tabName !== 'blocking');
         }
 
-        // Show/hide blocking settings button - only on settings tab
-        const popupBlockingBtn = document.getElementById('popup-blocking-btn');
-        if (popupBlockingBtn) {
-            popupBlockingBtn.classList.toggle('is-hidden', tabName !== 'settings');
-        }
-
-        // Save button visibility
         if (saveSettingsBtn) {
-            if (hasPendingChanges()) {
-                saveSettingsBtn.style.display = 'inline-flex';
-                saveSettingsBtn.disabled = false;
-            }
+            const shouldShowSave = tabName === 'settings' && hasPendingChanges();
+            saveSettingsBtn.style.display = shouldShowSave ? 'inline-flex' : 'none';
+            saveSettingsBtn.disabled = !shouldShowSave;
         }
     }
 
-    tabButtons.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const target = e.currentTarget;
-            // No-op if already active
-            if (target.classList.contains('active')) {
-                e.preventDefault();
-                return;
-            }
-
-            const tab = target.getAttribute('data-tab');
-            if (!tab || !(tab in tabViews)) return;
-
-            switchToTab(tab);
+    function showTabInstant(tabName) {
+        Object.entries(tabViews).forEach(([key, el]) => {
+            if (!el) return;
+            const show = key === tabName;
+            el.classList.toggle('active', show);
+            el.hidden = !show;
+            el.classList.remove('tab-animating');
+            el.style.transform = '';
         });
-    });
+
+        activeTabName = tabName;
+        updateToolbarForTab(tabName);
+    }
+
+    // Function to switch tabs programmatically
+    function switchToTab(tabName, options = {}) {
+        const { direction = 'forward', animate = true } = options;
+        const targetView = tabViews[tabName];
+        const currentView = tabViews[activeTabName];
+
+        if (!targetView || isTabTransitioning || tabName === activeTabName) return;
+
+        if (!animate || !currentView) {
+            showTabInstant(tabName);
+            return;
+        }
+
+        isTabTransitioning = true;
+
+        const enterFrom = direction === 'back' ? '-100%' : '100%';
+        const exitTo = direction === 'back' ? '100%' : '-100%';
+
+        targetView.hidden = false;
+        targetView.classList.add('active', 'tab-animating');
+        currentView.hidden = false;
+        currentView.classList.add('active', 'tab-animating');
+
+        targetView.style.transform = `translateX(${enterFrom})`;
+        currentView.style.transform = 'translateX(0)';
+
+        // Force a layout flush so transition starts from initial positions.
+        void targetView.offsetWidth;
+
+        requestAnimationFrame(() => {
+            targetView.style.transform = 'translateX(0)';
+            currentView.style.transform = `translateX(${exitTo})`;
+        });
+
+        let finished = false;
+        const complete = () => {
+            if (finished) return;
+            finished = true;
+
+            currentView.classList.remove('active', 'tab-animating');
+            currentView.hidden = true;
+            currentView.style.transform = '';
+
+            targetView.classList.remove('tab-animating');
+            targetView.style.transform = '';
+
+            activeTabName = tabName;
+            isTabTransitioning = false;
+            updateToolbarForTab(tabName);
+        };
+
+        targetView.addEventListener('transitionend', (event) => {
+            if (event.propertyName === 'transform') {
+                complete();
+            }
+        }, { once: true });
+
+        setTimeout(complete, 350);
+    }
+
+    const homeModeRow = document.getElementById('home-mode-row');
+    const homeBlockedRow = document.getElementById('home-blocked-row');
+    const backFromSettingsBtn = document.getElementById('back-from-settings-btn');
+    const backFromBlockingBtn = document.getElementById('back-from-blocking-btn');
+
+    if (homeModeRow) {
+        homeModeRow.addEventListener('click', () => {
+            switchToTab('settings', { direction: 'forward' });
+        });
+    }
+
+    if (homeBlockedRow) {
+        homeBlockedRow.addEventListener('click', () => {
+            switchToTab('blocking', { direction: 'forward' });
+        });
+    }
+
+    if (backFromSettingsBtn) {
+        backFromSettingsBtn.addEventListener('click', () => {
+            switchToTab('home', { direction: 'back' });
+        });
+    }
+
+    if (backFromBlockingBtn) {
+        backFromBlockingBtn.addEventListener('click', () => {
+            switchToTab('home', { direction: 'back' });
+        });
+    }
 
     // Initialize Settings toggles if present
     initSettingsToggles();
@@ -316,13 +238,19 @@ window.addEventListener("DOMContentLoaded", () => {
     // Initialize Blocking tab functionality
     initBlockingTab();
 
-    // Handle blocking icon button in settings tab
-    const popupBlockingBtn = document.getElementById('popup-blocking-btn');
-    if (popupBlockingBtn) {
-        popupBlockingBtn.addEventListener('click', () => {
-            switchToTab('blocking');
-        });
-    }
+    // Populate the home tab summary
+    refreshHomeSummary();
+
+    // Keep the home tab summary in sync while the popup is open
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local') return;
+        const relevantKeys = [...Object.values(settingsMap), 'blockedWebsites', 'darkModeEnabled'];
+        if (relevantKeys.some(key => key in changes)) {
+            refreshHomeSummary();
+        }
+    });
+
+    syncThemeToggleState();
 });
 
 
@@ -364,6 +292,42 @@ const modePresets = {
     }
 };
 
+function detectModeFromSettings(settings) {
+    for (const [modeName, preset] of Object.entries(modePresets)) {
+        const matches = Object.keys(preset).every(key => settings[key] === preset[key]);
+        if (matches) return modeName;
+    }
+    return 'custom';
+}
+
+function formatModeLabel(mode) {
+    return String(mode || 'custom')
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+async function refreshHomeSummary() {
+    const modeValue = document.getElementById('home-mode-value');
+    const blockedCount = document.getElementById('home-blocked-count');
+
+    try {
+        const [settings, blockedResult] = await Promise.all([
+            chrome.storage.local.get(Object.values(settingsMap)),
+            chrome.storage.local.get(['blockedWebsites'])
+        ]);
+
+        if (modeValue) {
+            modeValue.textContent = formatModeLabel(detectModeFromSettings(settings));
+        }
+
+        if (blockedCount) {
+            blockedCount.textContent = String((blockedResult.blockedWebsites || []).length);
+        }
+    } catch (error) {
+        console.error('Failed to refresh home summary:', error);
+    }
+}
+
 // Strictness levels (higher number = stricter)
 const strictnessLevels = {
     "off": 0,
@@ -398,15 +362,6 @@ function initSettingsToggles() {
     function showModeSelector() {
         modeView.hidden = false;
         customView.hidden = true;
-    }
-
-    // Determine current mode from stored settings
-    function detectMode(settings) {
-        for (const [modeName, preset] of Object.entries(modePresets)) {
-            const matches = Object.keys(preset).every(key => settings[key] === preset[key]);
-            if (matches) return modeName;
-        }
-        return 'custom';
     }
 
     // Apply mode preset to checkboxes, or restore custom settings
@@ -459,7 +414,7 @@ function initSettingsToggles() {
         }
 
         // Detect and set current mode
-        initialMode = detectMode(result);
+        initialMode = detectModeFromSettings(result);
         const modeRadio = document.querySelector(`input[name="settings-mode"][value="${initialMode}"]`);
         if (modeRadio) {
             modeRadio.checked = true;
@@ -489,7 +444,7 @@ function initSettingsToggles() {
             if (hasRelevantChanges) {
                 // Re-detect the active mode
                 chrome.storage.local.get(relevantKeys, (result) => {
-                    const newMode = detectMode(result);
+                    const newMode = detectModeFromSettings(result);
                     markActiveMode(newMode);
                     
                     // Update initial mode if different
@@ -505,6 +460,8 @@ function initSettingsToggles() {
                             }
                         });
                     }
+
+                    refreshHomeSummary();
                 });
             }
         }
@@ -719,6 +676,8 @@ function initSettingsToggles() {
                     });
                     markActiveMode(selectedMode);
                 }
+
+                refreshHomeSummary();
 
                 clearPendingChanges();
                 changed = false;

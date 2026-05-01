@@ -13,46 +13,75 @@
 </head>
 <body>
   <div id="popup">
-    <div class="line">
-      <!-- Logo -->
-      <div class="logo">
-        <img src="assets/logo_v2.png" alt="logo" />BTube
-      </div>
-
-      <!-- Settings section -->
-      <div class="controls">
-        <button id="save-settings-btn" class="save-settings-btn" disabled>Save</button>
-        <button id="add-block-btn" class="add-block-btn toolbar-btn is-hidden" title="Add blocked website or channel">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-            <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <button type="button" id="popup-blocking-btn" class="blocking-icon-btn toolbar-btn is-hidden" title="Manage Blocking">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <div class="dark" id="darkModeToggle">
-          <img src="assets/dark-theme.svg" alt="dark-theme" />
-        </div>
-      </div>
-    </div>
-
     <!-- tab content area -->
     <main class="content-area">
       <!-- Home tab view (default) -->
-      <section id="tab-home" class="tab-view active" aria-labelledby="tabbtn-home" role="region">
-        <!-- folder -->
-        <div class="lists">
-          <h2 class="folder-heading">Folders</h2>
-          <div class="folder"></div>
+      <section id="tab-home" class="tab-view active" aria-label="Home" role="region">
+        <div class="line">
+          <div class="logo">
+            <img src="assets/logo_v2.png" alt="logo" />BTube
+          </div>
+        </div>
+
+        <div class="home-list" aria-label="Quick controls">
+          <div class="home-row home-row-theme">
+            <div class="home-copy">
+              <div class="home-title">Theme</div>
+              <div class="home-subtitle">Switch between day and night</div>
+            </div>
+            <button type="button" id="darkModeToggle" class="theme-toggle" aria-label="Toggle theme" aria-pressed="false">
+              <span class="theme-icon theme-icon-light" aria-hidden="true">☀</span>
+              <span class="theme-track" aria-hidden="true">
+                <span class="theme-thumb"></span>
+              </span>
+              <span class="theme-icon theme-icon-dark" aria-hidden="true">☾</span>
+            </button>
+          </div>
+
+          <button type="button" id="home-mode-row" class="home-row home-row-button">
+            <div class="home-copy">
+              <div class="home-title">Mode</div>
+              <div class="home-subtitle">Current preset</div>
+            </div>
+            <div class="home-row-right">
+              <span id="home-mode-value" class="home-value">Custom</span>
+              <svg class="home-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </button>
+
+          <button type="button" id="home-blocked-row" class="home-row home-row-button">
+            <div class="home-copy">
+              <div class="home-title">Blocked Websites</div>
+              <div class="home-subtitle">Manage blocked items</div>
+            </div>
+            <div class="home-row-right">
+              <span id="home-blocked-count" class="home-value">0</span>
+              <svg class="home-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </button>
         </div>
       </section>
 
       <!-- Settings tab view -->
-      <section id="tab-settings" class="tab-view" aria-labelledby="tabbtn-settings" role="region" hidden>
+      <section id="tab-settings" class="tab-view" aria-label="Modes" role="region" hidden>
+        <div class="tab-page-header">
+          <div class="tab-page-header-left">
+            <button type="button" id="back-from-settings-btn" class="back-btn" aria-label="Back to Home">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <h2 id="settings-view-title">Mode</h2>
+          </div>
+          <div class="controls">
+            <button type="button" id="save-settings-btn" class="save-settings-btn" disabled>Save</button>
+          </div>
+        </div>
+
         <!-- Settings Mode Selector View -->
         <div class="settings-mode-view">
           <!-- Mode Selector Grid -->
@@ -154,11 +183,28 @@
       </section>
 
       <!-- Blocking tab view -->
-      <section id="tab-blocking" class="tab-view" aria-labelledby="tabbtn-blocking" role="region" hidden>
+      <section id="tab-blocking" class="tab-view" aria-label="Blocked Websites" role="region" hidden>
+        <div class="tab-page-header">
+          <div class="tab-page-header-left">
+            <button type="button" id="back-from-blocking-btn" class="back-btn" aria-label="Back to Home">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <h2 id="blocking-view-title">Blocked Websites</h2>
+          </div>
+          <div class="controls">
+            <button type="button" id="add-block-btn" class="add-block-btn toolbar-btn is-hidden" title="Add blocked website or channel">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
         <div class="blocking-container">
           <!-- Blocked Websites Section -->
           <div class="blocked-section">
-            <h3>Blocked Websites</h3>
             <div id="blocked-websites-list" class="blocked-list">
               <!-- Blocked websites will be dynamically inserted here -->
             </div>
@@ -169,28 +215,7 @@
       </section>
     </main>
 
-    <!-- Footer tab bar -->
-    <footer class="tabbar" role="tablist" aria-label="Navigation tabs">
-      <!-- Bookmarks tab -->
-      <button id="tabbtn-home" class="tab-btn active" data-tab="home" role="tab" aria-selected="true" aria-controls="tab-home">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span>Bookmarks</span>
-      </button>
 
-      <!-- Modes tab shows mode selector view inside popup -->
-      <button id="tabbtn-settings" class="tab-btn settings" data-tab="settings" role="tab" aria-selected="false" aria-controls="tab-settings">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span>Modes</span>
-      </button>
-    </footer>
-    
     <!-- Test notification button (hidden by default, uncomment for testing) -->
     <!-- <button id="test-notification" style="margin: 10px; padding: 8px 16px; background: #ff0000; color: white; border: none; border-radius: 4px; cursor: pointer;">Test Notification</button> -->
   </div>

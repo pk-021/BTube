@@ -1,6 +1,6 @@
 # BTube (BetterYoutube)
 
-BTube is a browser extension that enhances your YouTube experience by making it more productive and less distracting. It provides features to customize your homepage, block unwanted content, and organize your favorite videos with bookmarks and folders.
+BTube is a browser extension that enhances your YouTube experience by making it more productive and less distracting. It provides features to customize your homepage, block unwanted content, and manage the extension from a compact popup.
 
 ---
 
@@ -9,7 +9,6 @@ BTube is a browser extension that enhances your YouTube experience by making it 
 - **Minimal Homepage**: Hide the YouTube home feed for a cleaner, distraction-free experience.
 - **Redirect Home**: Automatically redirect the YouTube homepage and certain pages (like Trending and Shorts) to your Subscriptions feed.
 - **Disable Shorts**: Hide YouTube Shorts from the sidebar, search results, and homepage.
-- **Bookmarks & Folders**: Bookmark videos at specific timestamps and organize them into folders for easy access.
 - **Dark Mode**: Toggle dark mode for the extension popup and settings.
 - **Extension Lock**: Secure the extension with a password and reset it if forgotten.
 - **Smart Overlay Notifications**: Get beautiful, non-intrusive notifications that appear as overlays on any webpage - just like Bitwarden and other modern extensions.
@@ -29,14 +28,8 @@ BTube is a browser extension that enhances your YouTube experience by making it 
 ### 2. Open the Popup
 - Click the **BTube icon** in your browser toolbar to open the popup.  
 - From here, you can:  
-  - View and manage your bookmark folders.  
   - Access settings and toggle dark mode.  
-
-### 3. Bookmark Videos
-- On any YouTube video page, use the **bookmark button** in the video player controls.  
-- Save the current timestamp to a folder for quick access later.  
-
-### 4. Settings
+### 3. Settings
 - Open the **settings page** to:  
   - Enable or disable the extension.  
   - Toggle homepage redirection, hide Shorts, or enable a minimal homepage.  
@@ -60,7 +53,7 @@ BTube is a browser extension that enhances your YouTube experience by making it 
 ## Permissions
 
 - Access to YouTube pages (`*://*.youtube.com/*`)
-- Storage for settings and bookmarks
+- Storage for settings
 - Tab and navigation management
 - Declarative Net Request for redirecting pages
 - Notifications for user feedback

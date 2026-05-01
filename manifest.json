@@ -37,7 +37,6 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "assets/bookmark.svg",
         "assets/play.png",
         "assets/delete.png",
         "assets/save.png",
