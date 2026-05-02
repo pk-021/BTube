@@ -28,11 +28,51 @@ const modePresets = {
   }
 };
 
+const MODE_STORAGE_KEY = 'btube_mode';
+const MODE_SETTINGS_SNAPSHOT_KEY = 'btube_mode_settings_snapshot';
+const MODE_UPDATED_AT_KEY = 'btube_mode_updated_at';
+const VALID_MODES = new Set(['off', 'minimal', 'high-focus', 'custom']);
+
+function detectModeFromSettings(settings) {
+  for (const [modeName, preset] of Object.entries(modePresets)) {
+    const matches = Object.keys(preset).every((key) => settings[key] === preset[key]);
+    if (matches) return modeName;
+  }
+  return 'custom';
+}
+
+function pickSettingsSnapshot(settings) {
+  const keys = [
+    'BTubeOn',
+    'redirect_home',
+    'hide_shorts',
+    'minimal_homepage',
+    'enable_website_blocking',
+    'hide_sidebar_recommendations'
+  ];
+
+  return keys.reduce((acc, key) => {
+    acc[key] = !!settings[key];
+    return acc;
+  }, {});
+}
+
 // --- Initialize settings (set minimal mode as default if none exist) ---
 chrome.storage.local.get(null, (existing) => {
   // Remove any legacy defaultSettings or enable_channel_blocking
   const { enable_channel_blocking, ...rest } = existing;
   const mergedSettings = { ...modePresets.minimal, ...rest };
+
+  const settingsSnapshot = pickSettingsSnapshot(mergedSettings);
+  const detectedMode = detectModeFromSettings(settingsSnapshot);
+  const persistedMode = VALID_MODES.has(mergedSettings[MODE_STORAGE_KEY])
+    ? mergedSettings[MODE_STORAGE_KEY]
+    : detectedMode;
+  mergedSettings[MODE_STORAGE_KEY] = persistedMode;
+  mergedSettings[MODE_SETTINGS_SNAPSHOT_KEY] = settingsSnapshot;
+  if (typeof mergedSettings[MODE_UPDATED_AT_KEY] !== 'number') {
+    mergedSettings[MODE_UPDATED_AT_KEY] = Date.now();
+  }
   
   // Ensure new settings have default values if not present
   if (!('hide_sidebar_recommendations' in mergedSettings)) {

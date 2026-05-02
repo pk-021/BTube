@@ -199,7 +199,7 @@ html[dark_mode="true"] .blocking-link:hover {
 }
 
 html[dark_mode="true"] .blocking-icon-btn {
-    color: #3ea6ff;
+    color: #80aaff;
 }
 
 html[dark_mode="true"] .blocking-icon-btn:hover {
@@ -207,7 +207,7 @@ html[dark_mode="true"] .blocking-icon-btn:hover {
 }
 
 html[dark_mode="true"] .blocking-icon-btn:active {
-    background-color: #1a1a1a;
+    background-color: #3a3a3a;
 }
 
 html[dark_mode="true"] .slider {

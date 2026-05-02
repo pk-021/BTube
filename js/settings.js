@@ -12,10 +12,18 @@ function showNotification(message, type = 'info') {
 
 // --- Get dark mode preference ---
 function applyDarkMode() {
-    chrome.storage.local.get("darkModeEnabled", (data) => {
-        if (data.darkModeEnabled) {
+    chrome.storage.local.get("themeSetting", (data) => {
+        const themeSetting = data.themeSetting || 'system';
+        if (themeSetting === 'system') {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (prefersDark) {
+                document.documentElement.setAttribute("dark_mode", "true");
+            } else {
+                document.documentElement.removeAttribute("dark_mode");
+            }
+        } else if (themeSetting === 'dark') {
             document.documentElement.setAttribute("dark_mode", "true");
-        } else {
+        } else if (themeSetting === 'light') {
             document.documentElement.removeAttribute("dark_mode");
         }
     });
@@ -29,6 +37,67 @@ const settingsMap = {
     "disable-shorts": "hide_shorts",
     "minimal-homepage": "minimal_homepage"
 };
+
+const MODE_STORAGE_KEY = 'btube_mode';
+const MODE_SETTINGS_SNAPSHOT_KEY = 'btube_mode_settings_snapshot';
+const MODE_UPDATED_AT_KEY = 'btube_mode_updated_at';
+const SETTINGS_SNAPSHOT_KEYS = [
+    'BTubeOn',
+    'redirect_home',
+    'hide_shorts',
+    'minimal_homepage',
+    'enable_website_blocking',
+    'hide_sidebar_recommendations'
+];
+
+const modePresets = {
+    off: {
+        BTubeOn: false,
+        redirect_home: false,
+        hide_shorts: false,
+        minimal_homepage: false,
+        enable_website_blocking: false,
+        hide_sidebar_recommendations: false
+    },
+    minimal: {
+        BTubeOn: true,
+        redirect_home: false,
+        hide_shorts: true,
+        minimal_homepage: true,
+        enable_website_blocking: true,
+        hide_sidebar_recommendations: true
+    },
+    'high-focus': {
+        BTubeOn: true,
+        redirect_home: false,
+        hide_shorts: true,
+        minimal_homepage: true,
+        enable_website_blocking: true,
+        hide_sidebar_recommendations: true
+    }
+};
+
+function detectModeFromSettings(settings) {
+    for (const [modeName, preset] of Object.entries(modePresets)) {
+        const matches = Object.keys(preset).every((key) => settings[key] === preset[key]);
+        if (matches) return modeName;
+    }
+    return 'custom';
+}
+
+async function persistModeMetadataFromStorage() {
+    const current = await chrome.storage.local.get(SETTINGS_SNAPSHOT_KEYS);
+    const snapshot = {};
+    SETTINGS_SNAPSHOT_KEYS.forEach((key) => {
+        snapshot[key] = !!current[key];
+    });
+
+    await chrome.storage.local.set({
+        [MODE_STORAGE_KEY]: detectModeFromSettings(snapshot),
+        [MODE_SETTINGS_SNAPSHOT_KEY]: snapshot,
+        [MODE_UPDATED_AT_KEY]: Date.now()
+    });
+}
 
 
 
@@ -47,7 +116,11 @@ function initSettingsToggles() {
             // Save changes on toggle
             checkbox.addEventListener("change", () => {
                 const newValue = checkbox.checked;
-                chrome.storage.local.set({ [storageKey]: newValue });
+                chrome.storage.local.set({ [storageKey]: newValue }, () => {
+                    persistModeMetadataFromStorage().catch((err) => {
+                        console.error('Failed to persist mode metadata:', err);
+                    });
+                });
 
                 // (No HTML attribute logic here; only in content.js)
 

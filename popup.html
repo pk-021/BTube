@@ -27,15 +27,13 @@
           <div class="home-row home-row-theme">
             <div class="home-copy">
               <div class="home-title">Theme</div>
-              <div class="home-subtitle">Switch between day and night</div>
+              <div class="home-subtitle">Choose your preferred theme</div>
             </div>
-            <button type="button" id="darkModeToggle" class="theme-toggle" aria-label="Toggle theme" aria-pressed="false">
-              <span class="theme-icon theme-icon-light" aria-hidden="true">☀</span>
-              <span class="theme-track" aria-hidden="true">
-                <span class="theme-thumb"></span>
-              </span>
-              <span class="theme-icon theme-icon-dark" aria-hidden="true">☾</span>
-            </button>
+            <select id="themeSelector" class="theme-selector" aria-label="Theme selection">
+              <option value="system">System</option>
+              <option value="light">Day</option>
+              <option value="dark">Night</option>
+            </select>
           </div>
 
           <button type="button" id="home-mode-row" class="home-row home-row-button">

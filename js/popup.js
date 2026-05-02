@@ -10,41 +10,59 @@ function showNotification(message, type = 'info') {
     }
 }
 
-// --- Dark Mode Toggle ---
-const darkModeToggle = document.getElementById("darkModeToggle");
+// --- Theme Selector ---
+const themeSelector = document.getElementById("themeSelector");
 
-function syncThemeToggleState() {
-    if (!darkModeToggle) return;
-    const isDark = document.documentElement.hasAttribute("dark_mode");
-    darkModeToggle.classList.toggle("is-dark", isDark);
-    darkModeToggle.setAttribute("aria-pressed", String(isDark));
+function applyTheme(theme) {
+    if (theme === 'system') {
+        // Detect system preference
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (prefersDark) {
+            document.documentElement.setAttribute("dark_mode", "true");
+        } else {
+            document.documentElement.removeAttribute("dark_mode");
+        }
+    } else if (theme === 'dark') {
+        document.documentElement.setAttribute("dark_mode", "true");
+    } else if (theme === 'light') {
+        document.documentElement.removeAttribute("dark_mode");
+    }
 }
 
-// Load dark mode state on popup open
-chrome.storage.local.get("darkModeEnabled", (result) => {
-    if (result.darkModeEnabled) {
-        document.documentElement.setAttribute("dark_mode", "true");
-    } else {
-        document.documentElement.removeAttribute("dark_mode");
+function syncThemeSelectorState() {
+    if (!themeSelector) return;
+    chrome.storage.local.get("themeSetting", (result) => {
+        const themeSetting = result.themeSetting || 'system';
+        themeSelector.value = themeSetting;
+        applyTheme(themeSetting);
+    });
+}
+
+// Load theme setting on popup open
+chrome.storage.local.get("themeSetting", (result) => {
+    const themeSetting = result.themeSetting || 'system';
+    applyTheme(themeSetting);
+    if (themeSelector) {
+        themeSelector.value = themeSetting;
     }
-    syncThemeToggleState();
 });
 
-// Toggle dark mode on click
-darkModeToggle.addEventListener("click", () => {
-    const isDark = document.documentElement.hasAttribute("dark_mode");
+// Change theme on selection
+if (themeSelector) {
+    themeSelector.addEventListener("change", (e) => {
+        const selectedTheme = e.target.value;
+        applyTheme(selectedTheme);
+        chrome.storage.local.set({ themeSetting: selectedTheme });
+    });
+}
 
-    if (isDark) {
-        document.documentElement.removeAttribute("dark_mode");
-    } else {
-        document.documentElement.setAttribute("dark_mode", "true");
-    }
-
-    // Save preference
-    chrome.storage.local.set({ darkModeEnabled: !isDark });
-    syncThemeToggleState();
-    
-    // No notification for dark mode toggle
+// Listen for system theme changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    chrome.storage.local.get("themeSetting", (result) => {
+        if (result.themeSetting === 'system' || !result.themeSetting) {
+            syncThemeSelectorState();
+        }
+    });
 });
 
 
@@ -124,7 +142,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
         if (saveSettingsBtn) {
             const shouldShowSave = tabName === 'settings' && hasPendingChanges();
-            saveSettingsBtn.style.display = shouldShowSave ? 'inline-flex' : 'none';
+            saveSettingsBtn.classList.toggle('is-hidden', !shouldShowSave);
             saveSettingsBtn.disabled = !shouldShowSave;
         }
     }
@@ -250,7 +268,7 @@ window.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    syncThemeToggleState();
+    syncThemeSelectorState();
 });
 
 
@@ -263,6 +281,11 @@ const settingsMap = {
     "enable-website-blocking": "enable_website_blocking",
     "hide-sidebar-recommendations": "hide_sidebar_recommendations"
 };
+
+const MODE_STORAGE_KEY = 'btube_mode';
+const MODE_SETTINGS_SNAPSHOT_KEY = 'btube_mode_settings_snapshot';
+const MODE_UPDATED_AT_KEY = 'btube_mode_updated_at';
+const VALID_MODES = new Set(['off', 'minimal', 'high-focus', 'custom']);
 
 // Mode presets
 const modePresets = {
@@ -300,6 +323,29 @@ function detectModeFromSettings(settings) {
     return 'custom';
 }
 
+function normalizeMode(mode, fallback = 'minimal') {
+    return VALID_MODES.has(mode) ? mode : fallback;
+}
+
+function getCurrentSettingsFromUI() {
+    const settings = {};
+    Object.entries(settingsMap).forEach(([checkboxId, storageKey]) => {
+        const checkbox = document.getElementById(checkboxId);
+        if (checkbox) {
+            settings[storageKey] = checkbox.checked;
+        }
+    });
+    return settings;
+}
+
+function buildModeMetadata(mode, settingsSnapshot) {
+    return {
+        [MODE_STORAGE_KEY]: normalizeMode(mode, 'custom'),
+        [MODE_SETTINGS_SNAPSHOT_KEY]: settingsSnapshot,
+        [MODE_UPDATED_AT_KEY]: Date.now()
+    };
+}
+
 function formatModeLabel(mode) {
     return String(mode || 'custom')
         .replace(/-/g, ' ')
@@ -312,12 +358,15 @@ async function refreshHomeSummary() {
 
     try {
         const [settings, blockedResult] = await Promise.all([
-            chrome.storage.local.get(Object.values(settingsMap)),
+            chrome.storage.local.get([...Object.values(settingsMap), MODE_STORAGE_KEY]),
             chrome.storage.local.get(['blockedWebsites'])
         ]);
 
+        const detectedMode = detectModeFromSettings(settings);
+        const savedMode = normalizeMode(settings[MODE_STORAGE_KEY], detectedMode);
+
         if (modeValue) {
-            modeValue.textContent = formatModeLabel(detectModeFromSettings(settings));
+            modeValue.textContent = formatModeLabel(savedMode);
         }
 
         if (blockedCount) {
@@ -368,12 +417,16 @@ function initSettingsToggles() {
     function applyModeToCheckboxes(mode) {
         if (mode === 'custom') {
             // Restore custom settings from storage
-            chrome.storage.local.get('btube_custom_settings', (data) => {
+            chrome.storage.local.get(['btube_custom_settings', ...Object.values(settingsMap)], (data) => {
                 const custom = data.btube_custom_settings || {};
                 Object.entries(settingsMap).forEach(([checkboxId, storageKey]) => {
                     const checkbox = document.getElementById(checkboxId);
                     if (checkbox) {
-                        checkbox.checked = !!custom[storageKey];
+                        if (storageKey in custom) {
+                            checkbox.checked = !!custom[storageKey];
+                        } else {
+                            checkbox.checked = !!data[storageKey];
+                        }
                     }
                 });
             });
@@ -403,8 +456,9 @@ function initSettingsToggles() {
         }
     }
 
-    // Load initial values and detect mode
-    chrome.storage.local.get(Object.values(settingsMap), (result) => {
+    // Load initial values and detect mode. Prefer explicit saved mode for reliability,
+    // then self-heal if it is missing or invalid.
+    chrome.storage.local.get([...Object.values(settingsMap), MODE_STORAGE_KEY], (result) => {
         initialValues = {};
         for (const [checkboxId, storageKey] of Object.entries(settingsMap)) {
             const checkbox = document.getElementById(checkboxId);
@@ -414,7 +468,14 @@ function initSettingsToggles() {
         }
 
         // Detect and set current mode
-        initialMode = detectModeFromSettings(result);
+        const detectedMode = detectModeFromSettings(result);
+        initialMode = normalizeMode(result[MODE_STORAGE_KEY], detectedMode);
+
+        if (result[MODE_STORAGE_KEY] !== initialMode) {
+            const settingsSnapshot = getCurrentSettingsFromUI();
+            chrome.storage.local.set(buildModeMetadata(initialMode, settingsSnapshot));
+        }
+
         const modeRadio = document.querySelector(`input[name="settings-mode"][value="${initialMode}"]`);
         if (modeRadio) {
             modeRadio.checked = true;
@@ -430,7 +491,7 @@ function initSettingsToggles() {
         changed = false;
         if (saveBtn) {
             saveBtn.disabled = true;
-            saveBtn.style.display = 'none';
+            saveBtn.classList.add('is-hidden');
         }
     });
 
@@ -439,12 +500,13 @@ function initSettingsToggles() {
         if (area === 'local') {
             // Check if any settings that affect mode detection changed
             const relevantKeys = Object.values(settingsMap);
-            const hasRelevantChanges = relevantKeys.some(key => key in changes);
+            const hasRelevantChanges = relevantKeys.some(key => key in changes) || (MODE_STORAGE_KEY in changes);
             
             if (hasRelevantChanges) {
                 // Re-detect the active mode
-                chrome.storage.local.get(relevantKeys, (result) => {
-                    const newMode = detectModeFromSettings(result);
+                chrome.storage.local.get([...relevantKeys, MODE_STORAGE_KEY], (result) => {
+                    const detectedMode = detectModeFromSettings(result);
+                    const newMode = normalizeMode(result[MODE_STORAGE_KEY], detectedMode);
                     markActiveMode(newMode);
                     
                     // Update initial mode if different
@@ -479,7 +541,7 @@ function initSettingsToggles() {
                 changed = true;
                 if (saveBtn) {
                     saveBtn.disabled = false;
-                    saveBtn.style.display = 'inline-flex';
+                    saveBtn.classList.remove('is-hidden');
                 }
             }
             
@@ -520,8 +582,9 @@ function initSettingsToggles() {
             pendingChanges.hasSettingsChanges = changed;
             
             if (saveBtn) {
-                saveBtn.disabled = !hasPendingChanges();
-                saveBtn.style.display = hasPendingChanges() ? 'inline-flex' : 'none';
+                const shouldShowSave = hasPendingChanges();
+                saveBtn.classList.toggle('is-hidden', !shouldShowSave);
+                saveBtn.disabled = !shouldShowSave;
             }
         });
     });
@@ -549,8 +612,9 @@ function initSettingsToggles() {
             pendingChanges.hasSettingsChanges = changed;
             
             if (saveBtn) {
-                saveBtn.disabled = !hasPendingChanges();
-                saveBtn.style.display = hasPendingChanges() ? 'inline-flex' : 'none';
+                const shouldShowSave = hasPendingChanges();
+                saveBtn.classList.toggle('is-hidden', !shouldShowSave);
+                saveBtn.disabled = !shouldShowSave;
             }
         });
     });
@@ -599,18 +663,22 @@ function initSettingsToggles() {
                 if (selectedMode && selectedMode !== 'custom' && modePresets[selectedMode]) {
                     Object.assign(toSave, modePresets[selectedMode]);
                 } else {
-                    Object.entries(settingsMap).forEach(([checkboxId, storageKey]) => {
-                        const checkbox = document.getElementById(checkboxId);
-                        if (checkbox) {
-                            toSave[storageKey] = checkbox.checked;
-                        }
-                    });
+                    Object.assign(toSave, getCurrentSettingsFromUI());
                 }
                 hasPendingSettings = true;
 
+                const modeToPersist = normalizeMode(selectedMode, 'custom');
+                Object.assign(toSave, buildModeMetadata(modeToPersist, {
+                    ...Object.fromEntries(Object.values(settingsMap).map(key => [key, toSave[key]]))
+                }));
+
                 // Persist custom settings if in custom mode
-                if (selectedMode === 'custom') {
-                    await chrome.storage.local.set({ btube_custom_settings: toSave });
+                if (modeToPersist === 'custom') {
+                    await chrome.storage.local.set({
+                        btube_custom_settings: Object.fromEntries(
+                            Object.values(settingsMap).map(key => [key, toSave[key]])
+                        )
+                    });
                 }
             }
 
@@ -630,7 +698,7 @@ function initSettingsToggles() {
                 if (hasPendingSettings) {
                     const settingsOnly = {};
                     Object.entries(toSave).forEach(([key, val]) => {
-                        if (key !== 'blockedWebsites') {
+                        if (key !== 'blockedWebsites' && key !== MODE_STORAGE_KEY && key !== MODE_SETTINGS_SNAPSHOT_KEY && key !== MODE_UPDATED_AT_KEY) {
                             settingsOnly[key] = val;
                         }
                     });
@@ -682,7 +750,7 @@ function initSettingsToggles() {
                 clearPendingChanges();
                 changed = false;
                 saveBtn.disabled = true;
-                saveBtn.style.display = 'none';
+                saveBtn.classList.add('is-hidden');
 
                 // Reload blocked content from storage
                 const result = await chrome.storage.local.get(['blockedWebsites']);
@@ -946,8 +1014,9 @@ async function deleteBlockedWebsite(index) {
 // Helper function to update save button visibility
 function updateSaveButtonVisibility() {
     const saveBtn = document.getElementById('save-settings-btn');
-    if (saveBtn && hasPendingChanges()) {
-        saveBtn.style.display = 'inline-flex';
-        saveBtn.disabled = false;
-    }
+    if (!saveBtn) return;
+
+    const shouldShowSave = hasPendingChanges();
+    saveBtn.classList.toggle('is-hidden', !shouldShowSave);
+    saveBtn.disabled = !shouldShowSave;
 }

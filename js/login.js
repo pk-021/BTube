@@ -42,6 +42,68 @@ const resetWords = [
 ];
 let currentResetIndex = 0;
 
+const MODE_STORAGE_KEY = 'btube_mode';
+const MODE_SETTINGS_SNAPSHOT_KEY = 'btube_mode_settings_snapshot';
+const MODE_UPDATED_AT_KEY = 'btube_mode_updated_at';
+const VALID_MODES = new Set(['off', 'minimal', 'high-focus', 'custom']);
+
+const modePresets = {
+  off: {
+    BTubeOn: false,
+    redirect_home: false,
+    hide_shorts: false,
+    minimal_homepage: false,
+    enable_website_blocking: false,
+    hide_sidebar_recommendations: false
+  },
+  minimal: {
+    BTubeOn: true,
+    redirect_home: false,
+    hide_shorts: true,
+    minimal_homepage: true,
+    enable_website_blocking: true,
+    hide_sidebar_recommendations: true
+  },
+  'high-focus': {
+    BTubeOn: true,
+    redirect_home: false,
+    hide_shorts: true,
+    minimal_homepage: true,
+    enable_website_blocking: true,
+    hide_sidebar_recommendations: true
+  }
+};
+
+function normalizeMode(mode, fallback = 'minimal') {
+  return VALID_MODES.has(mode) ? mode : fallback;
+}
+
+function detectModeFromSettings(settings) {
+  for (const [modeName, preset] of Object.entries(modePresets)) {
+    const matches = Object.keys(preset).every(key => settings[key] === preset[key]);
+    if (matches) return modeName;
+  }
+  return 'custom';
+}
+
+function pickSettingsSnapshot(settings) {
+  const keys = [
+    'BTubeOn',
+    'redirect_home',
+    'hide_shorts',
+    'minimal_homepage',
+    'enable_website_blocking',
+    'hide_sidebar_recommendations'
+  ];
+
+  return keys.reduce((acc, key) => {
+    if (key in settings) {
+      acc[key] = settings[key];
+    }
+    return acc;
+  }, {});
+}
+
 // --- Helper to show/hide containers ---
 function showContainer(container) {
   [loginContainer, setupContainer, resetContainer].forEach((c) =>
@@ -61,10 +123,18 @@ function getPassword() {
 
 // --- Get dark mode preference ---
 function applyDarkMode() {
-  chrome.storage.local.get("darkModeEnabled", (data) => {
-    if (data.darkModeEnabled) {
+  chrome.storage.local.get("themeSetting", (data) => {
+    const themeSetting = data.themeSetting || 'system';
+    if (themeSetting === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (prefersDark) {
+        document.documentElement.setAttribute("dark_mode", "true");
+      } else {
+        document.documentElement.removeAttribute("dark_mode");
+      }
+    } else if (themeSetting === 'dark') {
       document.documentElement.setAttribute("dark_mode", "true");
-    } else {
+    } else if (themeSetting === 'light') {
       document.documentElement.removeAttribute("dark_mode");
     }
   });
@@ -118,6 +188,19 @@ saveButton.addEventListener("click", async () => {
   setupError.classList.add("hidden");
 });
 
+// --- Enter key for setup password ---
+newPasswordInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    saveButton.click();
+  }
+});
+
+confirmPasswordInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    saveButton.click();
+  }
+});
+
 // --- Check login ---
 async function checkPassword() {
   const enteredPass = input.value.trim();
@@ -136,11 +219,17 @@ async function checkPassword() {
 
       if (pendingSettings && typeof pendingSettings === 'object') {
         Object.assign(toSet, pendingSettings);
+        const snapshot = pickSettingsSnapshot(pendingSettings);
+        const detectedMode = detectModeFromSettings(snapshot);
+        const modeToPersist = normalizeMode(pendingMode, detectedMode);
+        toSet[MODE_STORAGE_KEY] = modeToPersist;
+        toSet[MODE_SETTINGS_SNAPSHOT_KEY] = snapshot;
+        toSet[MODE_UPDATED_AT_KEY] = Date.now();
         hadChanges = true;
         
         // If custom mode was selected, also save it to btube_custom_settings
-        if (pendingMode === 'custom') {
-          toSet.btube_custom_settings = pendingSettings;
+        if (modeToPersist === 'custom') {
+          toSet.btube_custom_settings = snapshot;
         }
       }
 
