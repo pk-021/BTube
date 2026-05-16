@@ -27,9 +27,11 @@
           placeholder="Confirm password"
         />
         <button id="save-password" class="btn-success">Save Password</button>
-        <p id="setup-error" class="text-danger hidden">
-          Passwords do not match!
-        </p>
+        <div class="error-slot">
+          <p id="setup-error" class="text-danger hidden">
+            Passwords do not match!
+          </p>
+        </div>
       </div>
 
       <!-- Login form -->
@@ -40,7 +42,9 @@
         <button id="forgot-password" class="forgot-btn">
           Forgot Password?
         </button>
-        <p id="error-message" class="text-danger hidden">Incorrect password!</p>
+        <div class="error-slot">
+          <p id="error-message" class="text-danger hidden">Incorrect password!</p>
+        </div>
       </div>
 
       <!-- Password reset form -->

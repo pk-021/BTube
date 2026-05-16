@@ -125,6 +125,13 @@ function showContainer(container) {
   container.classList.remove("hidden");
 }
 
+function showInlineError(errorElement, message) {
+  errorElement.textContent = message;
+  errorElement.classList.add("hidden");
+  void errorElement.offsetWidth;
+  errorElement.classList.remove("hidden");
+}
+
 // --- Promisify chrome.storage.local.get ---
 function getPassword() {
   return new Promise((resolve) => {
@@ -178,21 +185,20 @@ saveButton.addEventListener("click", async () => {
   const confirmPass = confirmPasswordInput.value.trim();
 
   if (!newPass) {
-    setupError.textContent = "Password cannot be empty.";
-    setupError.classList.remove("hidden");
+    showInlineError(setupError, "Password cannot be empty.");
     return;
   }
 
   if (newPass !== confirmPass) {
-    setupError.textContent = "Passwords do not match.";
-    setupError.classList.remove("hidden");
+    showInlineError(setupError, "Passwords do not match.");
     return;
   }
 
   if (!isStrongPassword(newPass)) {
-    setupError.textContent =
-      "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
-    setupError.classList.remove("hidden");
+    showInlineError(
+      setupError,
+      "Password must be at least 8 characters and include uppercase, lowercase, number, and special character."
+    );
     return;
   }
 
@@ -277,7 +283,7 @@ async function checkPassword() {
       }
     });
   } else {
-    error.classList.remove("hidden");
+    showInlineError(error, "Incorrect password!");
     input.value = "";
   }
 }

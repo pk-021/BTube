@@ -1,15 +1,22 @@
+html {
+  width: 380px;
+  height: 560px;
+  overflow: hidden;
+}
+
 /* --- Light Mode Base --- */
 body {
   user-select: none;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 450px;
-  width: 350px;
+  height: 560px;
+  width: 380px;
   margin: 0px;
   font-family: "Roboto", Arial, sans-serif;
   background-color: #f9f9f9;
   color: #0f0f0f;
+  overflow: hidden;
 }
 
 .card-container {
@@ -19,6 +26,9 @@ body {
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
+  min-height: 330px;
+  height: 330px;
+  overflow: hidden;
 }
 
 h3 {
@@ -61,6 +71,11 @@ input[type="text"]:focus {
   z-index: 1000;
   opacity: 1;
   transition: opacity 0.3s ease;
+}
+
+.error-slot {
+  min-height: 4.5rem;
+  margin-top: 6px;
 }
 
 .notification-content {
@@ -144,7 +159,24 @@ button {
   text-align: center;
   color: #cc0000;
   font-size: 0.85rem;
-  margin-top: 6px;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.text-danger:not(.hidden) {
+  animation: error-enter 180ms ease-out;
+}
+
+@keyframes error-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .current-word {
