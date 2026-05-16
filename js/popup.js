@@ -465,10 +465,81 @@ function initSettingsToggles() {
     const backToModesBtn = document.getElementById('back-to-modes-btn');
     const modeRadios = document.querySelectorAll('input[name="settings-mode"]');
     const customRadio = document.getElementById('custom-mode-radio');
+    const settingsViews = {
+        modes: modeView,
+        custom: customView
+    };
     
     let initialValues = {};
     let initialMode = 'custom';
     let changed = false;
+    let activeSettingsSubview = 'modes';
+    let isSettingsSubviewTransitioning = false;
+
+    function showSettingsSubview(viewName, options = {}) {
+        const { direction = 'forward', animate = true } = options;
+        const targetView = settingsViews[viewName];
+        const currentView = settingsViews[activeSettingsSubview];
+
+        if (!targetView || isSettingsSubviewTransitioning || viewName === activeSettingsSubview) {
+            return;
+        }
+
+        if (!animate || !currentView) {
+            Object.entries(settingsViews).forEach(([name, view]) => {
+                if (!view) return;
+                const isTarget = name === viewName;
+                view.hidden = !isTarget;
+                view.classList.remove('settings-view-animating');
+                view.style.transform = '';
+            });
+            activeSettingsSubview = viewName;
+            return;
+        }
+
+        isSettingsSubviewTransitioning = true;
+
+        const enterFrom = direction === 'back' ? '-100%' : '100%';
+        const exitTo = direction === 'back' ? '100%' : '-100%';
+
+        targetView.hidden = false;
+        currentView.hidden = false;
+        targetView.classList.add('settings-view-animating');
+        currentView.classList.add('settings-view-animating');
+        targetView.style.transform = `translateX(${enterFrom})`;
+        currentView.style.transform = 'translateX(0)';
+
+        void targetView.offsetWidth;
+
+        requestAnimationFrame(() => {
+            targetView.style.transform = 'translateX(0)';
+            currentView.style.transform = `translateX(${exitTo})`;
+        });
+
+        let finished = false;
+        const complete = () => {
+            if (finished) return;
+            finished = true;
+
+            currentView.classList.remove('settings-view-animating');
+            currentView.hidden = true;
+            currentView.style.transform = '';
+
+            targetView.classList.remove('settings-view-animating');
+            targetView.style.transform = '';
+
+            activeSettingsSubview = viewName;
+            isSettingsSubviewTransitioning = false;
+        };
+
+        targetView.addEventListener('transitionend', (event) => {
+            if (event.propertyName === 'transform') {
+                complete();
+            }
+        }, { once: true });
+
+        setTimeout(complete, 350);
+    }
 
     restoreSettingsState = async () => {
         const result = await chrome.storage.local.get([...Object.values(settingsMap), MODE_STORAGE_KEY]);
@@ -503,6 +574,21 @@ function initSettingsToggles() {
             editCustomBtn.hidden = initialMode !== 'custom';
         }
 
+        if (modeView) {
+            modeView.hidden = false;
+            modeView.classList.remove('settings-view-animating');
+            modeView.style.transform = '';
+        }
+
+        if (customView) {
+            customView.hidden = true;
+            customView.classList.remove('settings-view-animating');
+            customView.style.transform = '';
+        }
+
+        activeSettingsSubview = 'modes';
+        isSettingsSubviewTransitioning = false;
+
         markActiveMode(initialMode);
 
         changed = false;
@@ -511,14 +597,12 @@ function initSettingsToggles() {
 
     // Navigate to custom settings editor
     function showCustomEditor() {
-        modeView.hidden = true;
-        customView.hidden = false;
+        showSettingsSubview('custom', { direction: 'forward' });
     }
 
     // Navigate back to mode selector
     function showModeSelector() {
-        modeView.hidden = false;
-        customView.hidden = true;
+        showSettingsSubview('modes', { direction: 'back' });
     }
 
     // Apply mode preset to checkboxes, or restore custom settings
