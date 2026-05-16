@@ -34,6 +34,71 @@ body {
   transition: background-color 0.35s ease, color 0.35s ease;
 }
 
+.popup-footer {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 20px;
+  padding: 2px 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--bg);
+  box-sizing: border-box;
+  transition: min-height 0.2s ease, padding 0.2s ease;
+}
+
+html[dark_mode="true"] .popup-footer {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.popup-footer.has-pending {
+  min-height: 50px;
+  padding: 10px 14px;
+}
+
+.popup-footer-status {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+}
+
+.popup-footer-label {
+  font-size: 0.86rem;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+
+.popup-footer-label.is-idle {
+  opacity: 0.75;
+}
+
+.popup-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+}
+
+.popup-footer.has-pending .popup-footer-status,
+.popup-footer.has-pending .popup-footer-actions {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 /* Home quick list */
 .home-list {
   display: flex;
@@ -263,6 +328,7 @@ html[dark_mode="true"] .controls .dark:active {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -748,26 +814,15 @@ html[dark_mode="true"] .edit-custom-btn:hover {
 
 
 
-.save-settings-row {
-  width: 100%;
-  display: block;
-  padding: 18px 0 0 0;
-  background: none;
-}
-
-
-
-
-
 .save-settings-btn {
-  padding: 6px 14px;
-  min-width: 84px;
-  height: 36px;
+  padding: 5px 12px;
+  min-width: 72px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.95rem;
-  font-weight: 500;
+  font-size: 0.88rem;
+  font-weight: 400;
   background: var(--primary);
   color: #fff;
   border: none;
@@ -777,6 +832,37 @@ html[dark_mode="true"] .edit-custom-btn:hover {
   opacity: 1;
   transition: background 0.2s, opacity 0.2s;
   flex-shrink: 0;
+}
+
+.cancel-settings-btn {
+  padding: 0;
+  min-width: 0;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 400;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.cancel-settings-btn:hover {
+  color: var(--text);
+}
+
+.cancel-settings-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+html[dark_mode="true"] .cancel-settings-btn {
+  color: #b8c0cc;
+}
+
+html[dark_mode="true"] .cancel-settings-btn:hover {
+  color: #fff;
 }
 
 .save-settings-btn.is-hidden {

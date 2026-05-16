@@ -104,6 +104,19 @@ function pickSettingsSnapshot(settings) {
   }, {});
 }
 
+function safeRuntimeSendMessage(payload) {
+  try {
+    if (!chrome?.runtime?.id) return;
+    chrome.runtime.sendMessage(payload, () => {
+      if (chrome.runtime.lastError) {
+        console.debug('[runtime] login sendMessage skipped:', chrome.runtime.lastError.message);
+      }
+    });
+  } catch (e) {
+    console.debug('[runtime] login sendMessage exception:', e?.message || e);
+  }
+}
+
 // --- Helper to show/hide containers ---
 function showContainer(container) {
   [loginContainer, setupContainer, resetContainer].forEach((c) =>
@@ -246,19 +259,11 @@ async function checkPassword() {
           const keysToRemove = ['btube_pending_settings', 'btube_pending_block_updates', 'btube_has_pending_block_deletions', 'btube_original_block_lists', 'btube_pending_mode'];
                 chrome.storage.local.remove(keysToRemove, () => {
                   // Notify success (safe)
-                  try {
-                    if (chrome?.runtime?.id) {
-                      chrome.runtime.sendMessage({
-                        type: 'showNotification',
-                        message: 'Changes applied successfully!',
-                        notificationType: 'success'
-                      });
-                    }
-                  } catch (e) {
-                    if (e && /Extension context invalidated/i.test(e.message || '')) {
-                      console.log('[ctx-invalidated] login sendMessage suppressed:', e.message);
-                    }
-                  }
+                  safeRuntimeSendMessage({
+                    type: 'showNotification',
+                    message: 'Changes applied successfully!',
+                    notificationType: 'success'
+                  });
 
             // Redirect back to popup
             setTimeout(() => {
@@ -322,19 +327,11 @@ resetNextBtn.addEventListener("click", async () => {
 
 // --- Browser notification function ---
 function showBrowserNotification(message, type = 'info') {
-  try {
-    if (chrome?.runtime?.id) {
-      chrome.runtime.sendMessage({
-        type: 'showNotification',
-        message: message,
-        notificationType: type
-      });
-    }
-  } catch (e) {
-    if (e && /Extension context invalidated/i.test(e.message || '')) {
-      console.log('[ctx-invalidated] login sendMessage suppressed:', e.message);
-    }
-  }
+  safeRuntimeSendMessage({
+    type: 'showNotification',
+    message: message,
+    notificationType: type
+  });
 }
 
 // --- Custom notification function (for login page) ---

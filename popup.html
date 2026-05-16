@@ -75,9 +75,6 @@
             </button>
             <h2 id="settings-view-title">Mode</h2>
           </div>
-          <div class="controls">
-            <button type="button" id="save-settings-btn" class="save-settings-btn" disabled>Save</button>
-          </div>
         </div>
 
         <!-- Settings Mode Selector View -->
@@ -212,6 +209,16 @@
         </div>
       </section>
     </main>
+
+    <footer class="popup-footer" aria-label="Pending changes actions">
+      <div class="popup-footer-status" aria-live="polite">
+        <span id="pending-changes-label" class="popup-footer-label">Pending Changes</span>
+      </div>
+      <div class="popup-footer-actions">
+        <button type="button" id="cancel-changes-btn" class="cancel-settings-btn">Cancel</button>
+        <button type="button" id="save-settings-btn" class="save-settings-btn is-hidden" disabled>Save</button>
+      </div>
+    </footer>
 
 
     <!-- Test notification button (hidden by default, uncomment for testing) -->

@@ -58,9 +58,14 @@ function pickSettingsSnapshot(settings) {
 }
 
 // --- Initialize settings (set minimal mode as default if none exist) ---
-chrome.storage.local.get(null, (existing) => {
+chrome.storage.local.get(null, (existing = {}) => {
+  if (chrome.runtime.lastError) {
+    console.warn('[Startup] Failed to read settings:', chrome.runtime.lastError.message);
+  }
+
+  const safeExisting = (existing && typeof existing === 'object') ? existing : {};
   // Remove any legacy defaultSettings or enable_channel_blocking
-  const { enable_channel_blocking, ...rest } = existing;
+  const { enable_channel_blocking, ...rest } = safeExisting;
   const mergedSettings = { ...modePresets.minimal, ...rest };
 
   const settingsSnapshot = pickSettingsSnapshot(mergedSettings);
@@ -309,8 +314,12 @@ async function applyBlockedWebsiteRules(blockedWebsites) {
 }
 
 // Initialize blocked website rules on startup
-chrome.storage.local.get(['blockedWebsites'], (res) => {
-  const list = res.blockedWebsites || [];
+chrome.storage.local.get(['blockedWebsites'], (res = {}) => {
+  if (chrome.runtime.lastError) {
+    console.warn('[Startup] Failed to read blocked websites:', chrome.runtime.lastError.message);
+  }
+
+  const list = Array.isArray(res.blockedWebsites) ? res.blockedWebsites : [];
   console.log('[Startup] Initializing blocked website rules with', list.length, 'entries');
   applyBlockedWebsiteRules(list);
 });
@@ -329,8 +338,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
   // Also re-apply rules when the enable_website_blocking setting changes
   if (changes.enable_website_blocking) {
     console.log('[Storage] enable_website_blocking changed:', changes.enable_website_blocking.newValue);
-    chrome.storage.local.get(['blockedWebsites'], (res) => {
-      const list = res.blockedWebsites || [];
+    chrome.storage.local.get(['blockedWebsites'], (res = {}) => {
+      if (chrome.runtime.lastError) {
+        console.warn('[Storage] Failed to re-read blocked websites:', chrome.runtime.lastError.message);
+      }
+
+      const list = Array.isArray(res.blockedWebsites) ? res.blockedWebsites : [];
       applyBlockedWebsiteRules(list);
     });
   }

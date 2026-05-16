@@ -14,6 +14,19 @@ let offSettings = {
 
 let settingCache = {};
 
+function safeRuntimeSendMessage(payload) {
+    try {
+        if (!chrome?.runtime?.id) return;
+        chrome.runtime.sendMessage(payload, () => {
+            if (chrome.runtime.lastError) {
+                console.debug('[runtime] sendMessage skipped:', chrome.runtime.lastError.message);
+            }
+        });
+    } catch (e) {
+        console.debug('[runtime] sendMessage exception:', e?.message || e);
+    }
+}
+
 // =======================
 // Helper: Get Settings
 // =======================
@@ -38,8 +51,8 @@ function updateCurrentSettings() {
         }
         applyAttributes(settingCache);
 
-        chrome.runtime.sendMessage({ type: "toggleRedirects", enabled: settings.redirect_home });
-        chrome.runtime.sendMessage({ type: "toggleShorts", enabled: settings.hide_shorts });
+        safeRuntimeSendMessage({ type: "toggleRedirects", enabled: settings.redirect_home });
+        safeRuntimeSendMessage({ type: "toggleShorts", enabled: settings.hide_shorts });
 
         //when redirect is turned on at homepage
         if (settingCache.redirect_home) {

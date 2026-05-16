@@ -86,8 +86,38 @@ const pendingChanges = {
     hasDeletions: false
 };
 
+let restoreSettingsState = null;
+let restoreBlockedState = null;
+
 function hasPendingChanges() {
     return pendingChanges.hasSettingsChanges || pendingChanges.hasBlockChanges;
+}
+
+function setSaveButtonsVisibility(visible) {
+    const footer = document.querySelector('.popup-footer');
+    document.querySelectorAll('.save-settings-btn').forEach((button) => {
+        button.classList.toggle('is-hidden', !visible);
+        button.disabled = !visible;
+    });
+
+    const cancelButton = document.getElementById('cancel-changes-btn');
+    const pendingLabel = document.getElementById('pending-changes-label');
+
+    if (cancelButton) {
+        cancelButton.disabled = !visible;
+    }
+
+    if (footer) {
+        footer.classList.toggle('has-pending', visible);
+    }
+
+    if (pendingLabel) {
+        pendingLabel.textContent = 'Pending Changes';
+    }
+}
+
+function updateSaveButtonVisibility() {
+    setSaveButtonsVisibility(hasPendingChanges());
 }
 
 function clearPendingChanges() {
@@ -96,6 +126,42 @@ function clearPendingChanges() {
     pendingChanges.hasSettingsChanges = false;
     pendingChanges.hasBlockChanges = false;
     pendingChanges.hasDeletions = false;
+}
+
+async function discardPendingChanges() {
+    const restoreTasks = [];
+
+    if (typeof restoreSettingsState === 'function') {
+        restoreTasks.push(restoreSettingsState());
+    }
+
+    if (typeof restoreBlockedState === 'function') {
+        restoreTasks.push(restoreBlockedState());
+    }
+
+    const results = await Promise.allSettled(restoreTasks);
+    results.forEach((result) => {
+        if (result.status === 'rejected') {
+            console.error('Failed to restore pending popup state:', result.reason);
+        }
+    });
+
+    clearPendingChanges();
+    updateSaveButtonVisibility();
+    refreshHomeSummary();
+}
+
+function safeRuntimeSendMessage(payload) {
+    try {
+        if (!chrome?.runtime?.id) return;
+        chrome.runtime.sendMessage(payload, () => {
+            if (chrome.runtime.lastError) {
+                console.debug('[runtime] popup sendMessage skipped:', chrome.runtime.lastError.message);
+            }
+        });
+    } catch (e) {
+        console.debug('[runtime] popup sendMessage exception:', e?.message || e);
+    }
 }
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -131,7 +197,7 @@ window.addEventListener("DOMContentLoaded", () => {
         blocking: document.getElementById('tab-blocking')
     };
     const addBlockBtn = document.getElementById('add-block-btn');
-    const saveSettingsBtn = document.getElementById('save-settings-btn');
+    const cancelChangesBtn = document.getElementById('cancel-changes-btn');
     let activeTabName = 'home';
     let isTabTransitioning = false;
 
@@ -140,11 +206,7 @@ window.addEventListener("DOMContentLoaded", () => {
             addBlockBtn.classList.toggle('is-hidden', tabName !== 'blocking');
         }
 
-        if (saveSettingsBtn) {
-            const shouldShowSave = tabName === 'settings' && hasPendingChanges();
-            saveSettingsBtn.classList.toggle('is-hidden', !shouldShowSave);
-            saveSettingsBtn.disabled = !shouldShowSave;
-        }
+        updateSaveButtonVisibility();
     }
 
     function showTabInstant(tabName) {
@@ -247,6 +309,13 @@ window.addEventListener("DOMContentLoaded", () => {
     if (backFromBlockingBtn) {
         backFromBlockingBtn.addEventListener('click', () => {
             switchToTab('home', { direction: 'back' });
+        });
+    }
+
+    if (cancelChangesBtn) {
+        cancelChangesBtn.addEventListener('click', async () => {
+            if (!hasPendingChanges()) return;
+            await discardPendingChanges();
         });
     }
 
@@ -389,7 +458,7 @@ function initSettingsToggles() {
     const present = Object.keys(settingsMap).some(id => document.getElementById(id));
     if (!present) return; // settings view not rendered
 
-    const saveBtn = document.getElementById('save-settings-btn');
+    const saveButtons = document.querySelectorAll('.save-settings-btn');
     const modeView = document.querySelector('.settings-mode-view');
     const customView = document.querySelector('.settings-custom-view');
     const editCustomBtn = document.getElementById('edit-custom-btn');
@@ -400,6 +469,45 @@ function initSettingsToggles() {
     let initialValues = {};
     let initialMode = 'custom';
     let changed = false;
+
+    restoreSettingsState = async () => {
+        const result = await chrome.storage.local.get([...Object.values(settingsMap), MODE_STORAGE_KEY]);
+
+        initialValues = {};
+        for (const [checkboxId, storageKey] of Object.entries(settingsMap)) {
+            const checkbox = document.getElementById(checkboxId);
+            if (!checkbox) continue;
+            const value = !!result[storageKey];
+            checkbox.checked = value;
+            initialValues[checkboxId] = value;
+        }
+
+        const detectedMode = detectModeFromSettings(result);
+        initialMode = normalizeMode(result[MODE_STORAGE_KEY], detectedMode);
+
+        if (result[MODE_STORAGE_KEY] !== initialMode) {
+            const settingsSnapshot = getCurrentSettingsFromUI();
+            chrome.storage.local.set(buildModeMetadata(initialMode, settingsSnapshot));
+        }
+
+        const modeRadio = document.querySelector(`input[name="settings-mode"][value="${initialMode}"]`);
+        if (modeRadio) {
+            modeRadio.checked = true;
+        }
+
+        if (customRadio) {
+            customRadio.checked = initialMode === 'custom';
+        }
+
+        if (editCustomBtn) {
+            editCustomBtn.hidden = initialMode !== 'custom';
+        }
+
+        markActiveMode(initialMode);
+
+        changed = false;
+        updateSaveButtonVisibility();
+    };
 
     // Navigate to custom settings editor
     function showCustomEditor() {
@@ -458,42 +566,7 @@ function initSettingsToggles() {
 
     // Load initial values and detect mode. Prefer explicit saved mode for reliability,
     // then self-heal if it is missing or invalid.
-    chrome.storage.local.get([...Object.values(settingsMap), MODE_STORAGE_KEY], (result) => {
-        initialValues = {};
-        for (const [checkboxId, storageKey] of Object.entries(settingsMap)) {
-            const checkbox = document.getElementById(checkboxId);
-            if (!checkbox) continue;
-            checkbox.checked = !!result[storageKey];
-            initialValues[checkboxId] = !!result[storageKey];
-        }
-
-        // Detect and set current mode
-        const detectedMode = detectModeFromSettings(result);
-        initialMode = normalizeMode(result[MODE_STORAGE_KEY], detectedMode);
-
-        if (result[MODE_STORAGE_KEY] !== initialMode) {
-            const settingsSnapshot = getCurrentSettingsFromUI();
-            chrome.storage.local.set(buildModeMetadata(initialMode, settingsSnapshot));
-        }
-
-        const modeRadio = document.querySelector(`input[name="settings-mode"][value="${initialMode}"]`);
-        if (modeRadio) {
-            modeRadio.checked = true;
-            // Show edit button if custom mode is initially selected
-            if (initialMode === 'custom' && editCustomBtn) {
-                editCustomBtn.hidden = false;
-            }
-        }
-        
-        // Mark the active mode
-        markActiveMode(initialMode);
-
-        changed = false;
-        if (saveBtn) {
-            saveBtn.disabled = true;
-            saveBtn.classList.add('is-hidden');
-        }
-    });
+    restoreSettingsState();
 
     // Listen for storage changes to update active mode indicator
     chrome.storage.onChanged.addListener((changes, area) => {
@@ -539,10 +612,7 @@ function initSettingsToggles() {
             if (customRadio && !customRadio.checked) {
                 customRadio.checked = true;
                 changed = true;
-                if (saveBtn) {
-                    saveBtn.disabled = false;
-                    saveBtn.classList.remove('is-hidden');
-                }
+                updateSaveButtonVisibility();
             }
             
             showCustomEditor();
@@ -581,11 +651,7 @@ function initSettingsToggles() {
             
             pendingChanges.hasSettingsChanges = changed;
             
-            if (saveBtn) {
-                const shouldShowSave = hasPendingChanges();
-                saveBtn.classList.toggle('is-hidden', !shouldShowSave);
-                saveBtn.disabled = !shouldShowSave;
-            }
+            updateSaveButtonVisibility('settings');
         });
     });
 
@@ -611,17 +677,13 @@ function initSettingsToggles() {
             
             pendingChanges.hasSettingsChanges = changed;
             
-            if (saveBtn) {
-                const shouldShowSave = hasPendingChanges();
-                saveBtn.classList.toggle('is-hidden', !shouldShowSave);
-                saveBtn.disabled = !shouldShowSave;
-            }
+            updateSaveButtonVisibility('settings');
         });
     });
 
     // Save on button click - handles both settings and blocking changes
-    if (saveBtn) {
-    saveBtn.addEventListener('click', async () => {
+    saveButtons.forEach((saveBtn) => {
+        saveBtn.addEventListener('click', async () => {
             // Determine if login is required based on changes
             let requiresLogin = false;
 
@@ -726,7 +788,7 @@ function initSettingsToggles() {
                 // Save directly without login
                 await chrome.storage.local.set(toSave);
                 
-                chrome.runtime.sendMessage({
+                safeRuntimeSendMessage({
                     type: 'showNotification',
                     message: 'Changes saved successfully!',
                     notificationType: 'success'
@@ -749,8 +811,7 @@ function initSettingsToggles() {
 
                 clearPendingChanges();
                 changed = false;
-                saveBtn.disabled = true;
-                saveBtn.classList.add('is-hidden');
+                updateSaveButtonVisibility();
 
                 // Reload blocked content from storage
                 const result = await chrome.storage.local.get(['blockedWebsites']);
@@ -758,7 +819,7 @@ function initSettingsToggles() {
                 renderBlockedWebsites(pendingChanges.blockedWebsites);
             }
         });
-    }
+    });
 }
 
 // --- Blocking Tab Functionality ---
@@ -770,6 +831,24 @@ function initBlockingTab() {
     const saveOverlayBtn = document.getElementById('save-overlay-btn');
     const websiteInput = document.getElementById('website-input');
     const websiteUrlField = document.getElementById('website-url');
+
+    restoreBlockedState = async () => {
+        const result = await chrome.storage.local.get(['blockedWebsites']);
+        pendingChanges.blockedWebsites = (result.blockedWebsites || []).slice();
+        pendingChanges.hasBlockChanges = false;
+        pendingChanges.hasDeletions = false;
+        renderBlockedWebsites(pendingChanges.blockedWebsites);
+
+        if (overlay) {
+            overlay.hidden = true;
+        }
+
+        if (websiteUrlField) {
+            websiteUrlField.value = '';
+        }
+
+        updateSaveButtonVisibility();
+    };
     
     // Load blocked content when popup opens
     loadBlockedContent();
@@ -887,7 +966,7 @@ async function addBlockedWebsite(rawUrl) {
         // Re-render to show new item
         renderBlockedWebsites(pendingChanges.blockedWebsites);
 
-        chrome.runtime.sendMessage({
+        safeRuntimeSendMessage({
             type: 'showNotification',
             message: 'Website blocked successfully!',
             notificationType: 'success'
@@ -1011,12 +1090,3 @@ async function deleteBlockedWebsite(index) {
     }
 }
 
-// Helper function to update save button visibility
-function updateSaveButtonVisibility() {
-    const saveBtn = document.getElementById('save-settings-btn');
-    if (!saveBtn) return;
-
-    const shouldShowSave = hasPendingChanges();
-    saveBtn.classList.toggle('is-hidden', !shouldShowSave);
-    saveBtn.disabled = !shouldShowSave;
-}
