@@ -324,7 +324,7 @@ resetNextBtn.addEventListener("click", async () => {
       showCurrentWord();
     }
   } else {
-    showNotification("Incorrect word! Start over.");
+    showNotification("Incorrect word! Start over.", resetContainer);
     currentResetIndex = 0;
     resetInput.value = "";
     showCurrentWord();
