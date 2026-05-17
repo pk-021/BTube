@@ -10,12 +10,14 @@ const input = document.getElementById("password-input");
 const button = document.getElementById("submit-password");
 const error = document.getElementById("error-message");
 const forgotButton = document.getElementById("forgot-password");
+const backFromLoginBtn = document.getElementById("back-from-login-btn");
 
 // --- Setup elements ---
 const newPasswordInput = document.getElementById("new-password");
 const confirmPasswordInput = document.getElementById("confirm-password");
 const saveButton = document.getElementById("save-password");
 const setupError = document.getElementById("setup-error");
+const backFromSetupBtn = document.getElementById("back-from-setup-btn");
 
 // --- Custom notification elements ---
 const customNotification = document.getElementById("custom-notification");
@@ -26,6 +28,7 @@ const notificationCloseButton = document.getElementById("notification-close");
 const currentWordEl = document.getElementById("current-word");
 const resetInput = document.getElementById("reset-input");
 const resetNextBtn = document.getElementById("reset-next");
+const backFromResetBtn = document.getElementById("back-from-reset-btn");
 
 // --- Reset words ---
 const resetWords = [
@@ -41,6 +44,68 @@ const resetWords = [
   "dragon",
 ];
 let currentResetIndex = 0;
+let resetReturnContainer = loginContainer;
+// Persist the immediately previous page so all back buttons go there
+const URL_FROM_PARAM = new URLSearchParams(window.location.search).get("from");
+const IS_EMBEDDED_LOGIN = new URLSearchParams(window.location.search).get('embedded') === '1';
+const SAVED_PREV_KEY = 'btube_prev_page';
+
+function notifyParent(type, detail = {}) {
+  if (!IS_EMBEDDED_LOGIN || window.parent === window) {
+    return false;
+  }
+
+  try {
+    window.parent.postMessage({
+      source: 'btube-login-overlay',
+      type,
+      detail
+    }, window.location.origin);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function savePreviousPage() {
+  // Do not overwrite if a caller already saved a prev page (e.g., popup)
+  try {
+    const existing = sessionStorage.getItem(SAVED_PREV_KEY);
+    if (existing) {
+      return;
+    }
+  } catch (e) {
+    // ignore
+  }
+  try {
+    let prev = null;
+    if (URL_FROM_PARAM === 'popup') {
+      prev = 'popup.html';
+    } else if (document.referrer) {
+      prev = document.referrer;
+    } else if (window.opener && window.opener.location && window.opener.location.href) {
+      prev = window.opener.location.href;
+    } else {
+      prev = 'popup.html';
+    }
+
+    // Avoid saving the current page as the previous page
+    const resolvedPrev = new URL(prev, window.location.href).href;
+    if (resolvedPrev !== window.location.href) {
+      sessionStorage.setItem(SAVED_PREV_KEY, resolvedPrev);
+    } else {
+      const fallback = new URL('popup.html', window.location.href).href;
+      sessionStorage.setItem(SAVED_PREV_KEY, fallback);
+    }
+  } catch (e) {
+    sessionStorage.setItem(SAVED_PREV_KEY, new URL('popup.html', window.location.href).href);
+  }
+}
+
+function getSavedPreviousPage() {
+  const v = sessionStorage.getItem(SAVED_PREV_KEY) || new URL('popup.html', window.location.href).href;
+  return v;
+}
 
 const MODE_STORAGE_KEY = 'btube_mode';
 const MODE_SETTINGS_SNAPSHOT_KEY = 'btube_mode_settings_snapshot';
@@ -125,6 +190,51 @@ function showContainer(container) {
   container.classList.remove("hidden");
 }
 
+function goBackToPreviousPage() {
+  if (notifyParent('close')) {
+    return;
+  }
+
+  const saved = getSavedPreviousPage();
+  const current = window.location.href;
+  let target;
+  try {
+    target = new URL(saved, window.location.href).href;
+  } catch (e) {
+    target = new URL('popup.html', window.location.href).href;
+  }
+  // If a saved target exists, prefer navigating to it; try history.back() first
+  if (window.history.length > 1) {
+    try {
+      window.history.back();
+    } catch (e) {
+      // ignore
+    }
+
+    // After a short delay, if we're not at the saved target, force navigation to it
+    setTimeout(() => {
+      if (window.location.href !== target) {
+        window.location.href = target;
+      }
+    }, 250);
+    return;
+  }
+
+  // No history — go directly to saved target
+  if (target && target !== window.location.href) {
+    window.location.href = target;
+    return;
+  }
+
+  // Final fallback
+  window.location.href = new URL('popup.html', window.location.href).href;
+}
+
+function isClickOutsideCard(target) {
+  const card = document.querySelector(".card-container");
+  return Boolean(card && target && !card.contains(target));
+}
+
 function showInlineError(errorElement, message) {
   errorElement.textContent = message;
   errorElement.classList.add("hidden");
@@ -169,6 +279,8 @@ function isStrongPassword(password) {
 
 // --- Initialize page ---
 async function init() {
+  // Persist the immediately previous page for unified back navigation
+  savePreviousPage();
   applyDarkMode(); // Apply dark mode on load
 
   const password = await getPassword();
@@ -206,6 +318,10 @@ saveButton.addEventListener("click", async () => {
   showNotification("Password set successfully! Please log in.", loginContainer);
   setupError.classList.add("hidden");
 });
+
+if (backFromSetupBtn) {
+  backFromSetupBtn.addEventListener("click", goBackToPreviousPage);
+}
 
 // --- Enter key for setup password ---
 newPasswordInput.addEventListener("keypress", (e) => {
@@ -271,15 +387,19 @@ async function checkPassword() {
                     notificationType: 'success'
                   });
 
-            // Redirect back to popup
-            setTimeout(() => {
-              window.location.href = 'popup.html';
-            }, 500);
+                      // Close the embedded overlay or return to the page that opened login
+                      setTimeout(() => {
+                        if (!notifyParent('success')) {
+                          goBackToPreviousPage();
+                        }
+                      }, 500);
           });
         });
       } else {
-        // No pending changes – go back to popup by default
-        window.location.href = 'popup.html';
+        // No pending changes – still return to the page that opened login
+                  if (!notifyParent('success')) {
+                    goBackToPreviousPage();
+                  }
       }
     });
   } else {
@@ -293,13 +413,34 @@ input.addEventListener("keypress", (e) => {
   if (e.key === "Enter") checkPassword();
 });
 
+if (backFromLoginBtn) {
+  backFromLoginBtn.addEventListener("click", goBackToPreviousPage);
+}
+
+document.addEventListener("click", (event) => {
+  if (!document.body.contains(loginContainer)) return;
+  if (!loginContainer || loginContainer.classList.contains("hidden")) return;
+  if (!isClickOutsideCard(event.target)) return;
+  if (!customNotification.classList.contains("hidden")) return;
+  goBackToPreviousPage();
+});
+
 // --- Forgot password ---
 forgotButton.addEventListener("click", () => {
+  resetReturnContainer = loginContainer;
   currentResetIndex = 0;
   resetInput.value = "";
   showCurrentWord();
   showContainer(resetContainer);
 });
+
+if (backFromResetBtn) {
+  backFromResetBtn.addEventListener("click", () => {
+    currentResetIndex = 0;
+    resetInput.value = "";
+    goBackToPreviousPage();
+  });
+}
 
 // --- Show current word ---
 function showCurrentWord() {

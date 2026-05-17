@@ -185,6 +185,48 @@ button {
   margin-bottom: 10px;
 }
 
+.screen-header,
+.reset-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.screen-header h3,
+.reset-header h3 {
+  margin: 0;
+  flex: 1;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  width: auto;
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.back-btn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+#login-container #back-from-login-btn {
+  position: fixed;
+  top: 12px;
+  left: 16px;
+  z-index: 20;
+  padding: 6px;
+  border-radius: 6px;
+}
+
 .hidden {
   display: none !important;
 }
@@ -237,6 +279,10 @@ html[dark_mode="true"] .btn-warning:hover {
 
 html[dark_mode="true"] .forgot-btn {
   color: #80aaff;
+}
+
+html[dark_mode="true"] .back-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 html[dark_mode="true"] .forgot-btn:hover {

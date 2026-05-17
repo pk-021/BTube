@@ -1353,3 +1353,22 @@ html[dark_mode="true"] .beta-label {
   cursor: not-allowed;
 }
 
+/* Login Overlay */
+.login-overlay .overlay-content {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  animation: none;
+}
+
+.login-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+

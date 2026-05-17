@@ -88,6 +88,7 @@ const pendingChanges = {
 
 let restoreSettingsState = null;
 let restoreBlockedState = null;
+let loginOverlay = null;
 
 function hasPendingChanges() {
     return pendingChanges.hasSettingsChanges || pendingChanges.hasBlockChanges;
@@ -164,6 +165,35 @@ function safeRuntimeSendMessage(payload) {
     }
 }
 
+function logNavUpdate(label, value) {
+    console.log(label, value);
+    try { localStorage.setItem('debug_nav_last', String(value)); } catch (e) {}
+}
+
+function createLoginOverlayController() {
+    const overlay = document.getElementById('login-overlay');
+    const frame = document.getElementById('login-frame');
+
+    const loadLoginFrame = () => {
+        if (!frame) return;
+        frame.src = 'login.html?from=popup&embedded=1';
+    };
+
+    const show = () => {
+        if (!overlay || !frame) return;
+        loadLoginFrame();
+        overlay.hidden = false;
+    };
+
+    const hide = () => {
+        if (!overlay || !frame) return;
+        overlay.hidden = true;
+        frame.src = 'about:blank';
+    };
+
+    return { show, hide };
+}
+
 window.addEventListener("DOMContentLoaded", () => {
     // Test notification button (uncomment for testing)
     const testBtn = document.getElementById("test-notification");
@@ -196,10 +226,12 @@ window.addEventListener("DOMContentLoaded", () => {
         settings: document.getElementById('tab-settings'),
         blocking: document.getElementById('tab-blocking')
     };
+    loginOverlay = createLoginOverlayController();
     const addBlockBtn = document.getElementById('add-block-btn');
     const cancelChangesBtn = document.getElementById('cancel-changes-btn');
     let activeTabName = 'home';
     let isTabTransitioning = false;
+    // Optional initial subview requested via hash (e.g. #settings:modes)
 
     function updateToolbarForTab(tabName) {
         if (addBlockBtn) {
@@ -283,6 +315,8 @@ window.addEventListener("DOMContentLoaded", () => {
         setTimeout(complete, 350);
     }
 
+    // (hash handling moved into initSettingsToggles to avoid scope issues)
+
     const homeModeRow = document.getElementById('home-mode-row');
     const homeBlockedRow = document.getElementById('home-blocked-row');
     const backFromSettingsBtn = document.getElementById('back-from-settings-btn');
@@ -290,24 +324,50 @@ window.addEventListener("DOMContentLoaded", () => {
 
     if (homeModeRow) {
         homeModeRow.addEventListener('click', () => {
+            logNavUpdate('[nav] home -> settings', 'modes');
             switchToTab('settings', { direction: 'forward' });
         });
     }
 
     if (homeBlockedRow) {
         homeBlockedRow.addEventListener('click', () => {
+            logNavUpdate('[nav] home -> blocking', 'blocking');
             switchToTab('blocking', { direction: 'forward' });
         });
     }
 
     if (backFromSettingsBtn) {
         backFromSettingsBtn.addEventListener('click', () => {
+            const saved = sessionStorage.getItem('btube_prev_page');
+            if (saved) {
+                try {
+                    const target = new URL(saved, window.location.href).href;
+                    if (target && target !== window.location.href) {
+                        window.location.href = target;
+                        return;
+                    }
+                } catch (e) {
+                    // ignore and fallback to tab
+                }
+            }
             switchToTab('home', { direction: 'back' });
         });
     }
 
     if (backFromBlockingBtn) {
         backFromBlockingBtn.addEventListener('click', () => {
+            const saved = sessionStorage.getItem('btube_prev_page');
+            if (saved) {
+                try {
+                    const target = new URL(saved, window.location.href).href;
+                    if (target && target !== window.location.href) {
+                        window.location.href = target;
+                        return;
+                    }
+                } catch (e) {
+                    // ignore and fallback to tab
+                }
+            }
             switchToTab('home', { direction: 'back' });
         });
     }
@@ -318,6 +378,28 @@ window.addEventListener("DOMContentLoaded", () => {
             await discardPendingChanges();
         });
     }
+
+    window.addEventListener('message', async (event) => {
+        if (event.origin !== window.location.origin) return;
+        const data = event.data || {};
+        if (data.source !== 'btube-login-overlay') return;
+
+        if (data.type === 'close') {
+            loginOverlay.hide();
+            return;
+        }
+
+        if (data.type === 'success') {
+            loginOverlay.hide();
+            clearPendingChanges();
+            updateSaveButtonVisibility();
+            await Promise.allSettled([
+                typeof restoreSettingsState === 'function' ? restoreSettingsState() : Promise.resolve(),
+                typeof restoreBlockedState === 'function' ? restoreBlockedState() : Promise.resolve()
+            ]);
+            refreshHomeSummary();
+        }
+    });
 
     // Initialize Settings toggles if present
     initSettingsToggles();
@@ -539,6 +621,21 @@ function initSettingsToggles() {
         }, { once: true });
 
         setTimeout(complete, 350);
+    }
+
+    // If a desired settings subview was requested on load, show it now without animation
+    // If a desired settings subview was requested via the URL hash, show it now without animation
+    try {
+        const h = window.location.hash || '';
+        if (h.startsWith('#settings')) {
+            const parts = h.replace('#settings', '').replace(/^:/, '').split(':');
+            const desired = parts[1] || (parts[0] || 'modes');
+            showSettingsSubview(desired, { animate: false, direction: 'back' });
+        } else if (h.startsWith('#blocking')) {
+            switchToTab('blocking', { animate: false });
+        }
+    } catch (e) {
+        // ignore
     }
 
     restoreSettingsState = async () => {
@@ -866,8 +963,25 @@ function initSettingsToggles() {
                     }
                 }
 
-                await chrome.storage.local.set(pendingData);
-                window.location.href = 'login.html?from=popup';
+                                await chrome.storage.local.set(pendingData);
+                                try {
+                                    // Save a richer prev page: include popup tab + optional settings subview
+                                    let saved = 'popup.html';
+                                    if (activeTabName === 'settings') {
+                                        // activeSettingsSubview is defined inside initSettingsToggles
+                                        const sub = (typeof activeSettingsSubview !== 'undefined' && activeSettingsSubview) ? activeSettingsSubview : 'modes';
+                                        saved += `#settings:${sub}`;
+                                    } else if (activeTabName === 'blocking') {
+                                        saved += '#blocking';
+                                    } else {
+                                        saved = window.location.href;
+                                    }
+                                    sessionStorage.setItem('btube_prev_page', saved);
+                                    logNavUpdate('[nav] btube_prev_page updated ->', saved);
+                                } catch (e) {
+                                    // ignore
+                                }
+                                loginOverlay.show();
             } else {
                 // Save directly without login
                 await chrome.storage.local.set(toSave);
