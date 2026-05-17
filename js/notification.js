@@ -2,8 +2,16 @@
 
 // Apply dark mode on load
 function applyDarkMode() {
-  chrome.storage.local.get("darkModeEnabled", (data) => {
-    if (data.darkModeEnabled) {
+  chrome.storage.local.get("themeSetting", (data) => {
+    const themeSetting = data.themeSetting || 'system';
+    if (themeSetting === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (prefersDark) {
+        document.documentElement.setAttribute("dark_mode", "true");
+      } else {
+        document.documentElement.removeAttribute("dark_mode");
+      }
+    } else if (themeSetting === 'dark') {
       document.documentElement.setAttribute("dark_mode", "true");
     } else {
       document.documentElement.removeAttribute("dark_mode");

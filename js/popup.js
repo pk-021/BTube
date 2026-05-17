@@ -12,6 +12,7 @@ function showNotification(message, type = 'info') {
 
 // --- Theme Selector ---
 const themeSelector = document.getElementById("themeSelector");
+const THEME_CACHE_KEY = 'btube_theme_cache';
 
 function applyTheme(theme) {
     if (theme === 'system') {
@@ -35,6 +36,7 @@ function syncThemeSelectorState() {
         const themeSetting = result.themeSetting || 'system';
         themeSelector.value = themeSetting;
         applyTheme(themeSetting);
+        try { localStorage.setItem(THEME_CACHE_KEY, themeSetting); } catch (e) {}
     });
 }
 
@@ -45,6 +47,7 @@ chrome.storage.local.get("themeSetting", (result) => {
     if (themeSelector) {
         themeSelector.value = themeSetting;
     }
+    try { localStorage.setItem(THEME_CACHE_KEY, themeSetting); } catch (e) {}
 });
 
 // Change theme on selection
@@ -53,6 +56,7 @@ if (themeSelector) {
         const selectedTheme = e.target.value;
         applyTheme(selectedTheme);
         chrome.storage.local.set({ themeSetting: selectedTheme });
+        try { localStorage.setItem(THEME_CACHE_KEY, selectedTheme); } catch (err) {}
     });
 }
 
@@ -110,6 +114,7 @@ function setSaveButtonsVisibility(visible) {
 
     if (footer) {
         footer.classList.toggle('has-pending', visible);
+        footer.hidden = !visible;
     }
 
     if (pendingLabel) {
@@ -121,9 +126,13 @@ function updateSaveButtonVisibility() {
     setSaveButtonsVisibility(hasPendingChanges());
 }
 
-function clearPendingChanges() {
+function clearPendingChanges(options = {}) {
+    const { preserveBlockedWebsites = false } = options;
+
     pendingChanges.settings = null;
-    pendingChanges.blockedWebsites = null;
+    if (!preserveBlockedWebsites) {
+        pendingChanges.blockedWebsites = null;
+    }
     pendingChanges.hasSettingsChanges = false;
     pendingChanges.hasBlockChanges = false;
     pendingChanges.hasDeletions = false;
@@ -147,7 +156,7 @@ async function discardPendingChanges() {
         }
     });
 
-    clearPendingChanges();
+    clearPendingChanges({ preserveBlockedWebsites: true });
     updateSaveButtonVisibility();
     refreshHomeSummary();
 }
@@ -172,23 +181,14 @@ function logNavUpdate(label, value) {
 
 function createLoginOverlayController() {
     const overlay = document.getElementById('login-overlay');
-    const frame = document.getElementById('login-frame');
-
-    const loadLoginFrame = () => {
-        if (!frame) return;
-        frame.src = 'login.html?from=popup&embedded=1';
-    };
-
     const show = () => {
-        if (!overlay || !frame) return;
-        loadLoginFrame();
+        if (!overlay) return;
         overlay.hidden = false;
     };
 
     const hide = () => {
-        if (!overlay || !frame) return;
+        if (!overlay) return;
         overlay.hidden = true;
-        frame.src = 'about:blank';
     };
 
     return { show, hide };
@@ -227,6 +227,21 @@ window.addEventListener("DOMContentLoaded", () => {
         blocking: document.getElementById('tab-blocking')
     };
     loginOverlay = createLoginOverlayController();
+    window.BTubeLoginHost = {
+        close: () => {
+            loginOverlay.hide();
+        },
+        success: async () => {
+            loginOverlay.hide();
+            clearPendingChanges();
+            updateSaveButtonVisibility();
+            await Promise.allSettled([
+                typeof restoreSettingsState === 'function' ? restoreSettingsState() : Promise.resolve(),
+                typeof restoreBlockedState === 'function' ? restoreBlockedState() : Promise.resolve()
+            ]);
+            refreshHomeSummary();
+        }
+    };
     const addBlockBtn = document.getElementById('add-block-btn');
     const cancelChangesBtn = document.getElementById('cancel-changes-btn');
     let activeTabName = 'home';
@@ -378,28 +393,6 @@ window.addEventListener("DOMContentLoaded", () => {
             await discardPendingChanges();
         });
     }
-
-    window.addEventListener('message', async (event) => {
-        if (event.origin !== window.location.origin) return;
-        const data = event.data || {};
-        if (data.source !== 'btube-login-overlay') return;
-
-        if (data.type === 'close') {
-            loginOverlay.hide();
-            return;
-        }
-
-        if (data.type === 'success') {
-            loginOverlay.hide();
-            clearPendingChanges();
-            updateSaveButtonVisibility();
-            await Promise.allSettled([
-                typeof restoreSettingsState === 'function' ? restoreSettingsState() : Promise.resolve(),
-                typeof restoreBlockedState === 'function' ? restoreBlockedState() : Promise.resolve()
-            ]);
-            refreshHomeSummary();
-        }
-    });
 
     // Initialize Settings toggles if present
     initSettingsToggles();
@@ -1197,6 +1190,7 @@ function renderBlockedWebsites(websites) {
     const emptyMessage = document.getElementById('empty-websites');
     
     if (!listContainer) return;
+    if (!Array.isArray(websites)) websites = [];
 
     listContainer.innerHTML = '';
 
@@ -1207,9 +1201,9 @@ function renderBlockedWebsites(websites) {
 
     emptyMessage.hidden = true;
 
-    websites.forEach((website, index) => {
+    websites.forEach((website) => {
         const item = createBlockedItem(website.url, () => {
-            deleteBlockedWebsite(index);
+            deleteBlockedWebsite(website.url);
         }, website.isPending, website.isDeleted);
         listContainer.appendChild(item);
     });
@@ -1263,9 +1257,16 @@ function createBlockedItem(title, onDelete, isPending = false, isDeleted = false
 }
 
 // Delete blocked website
-async function deleteBlockedWebsite(index) {
+async function deleteBlockedWebsite(blockedUrl) {
     try {
-        const item = pendingChanges.blockedWebsites[index];
+        if (!blockedUrl || !Array.isArray(pendingChanges.blockedWebsites)) {
+            return;
+        }
+
+        const item = pendingChanges.blockedWebsites.find((entry) => entry && entry.url === blockedUrl);
+        if (!item) {
+            return;
+        }
         
         if (item.isDeleted) {
             // Undo deletion - restore the item

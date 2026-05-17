@@ -22,13 +22,20 @@ body {
 .card-container {
   background: #fff;
   margin: 20px;
-  padding: 20px 25px;
+  padding: 28px 28px;
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   box-sizing: border-box;
-  min-height: 330px;
-  height: 330px;
   overflow: hidden;
+}
+
+body:not([data-loaded]) .card-container {
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+}
+
+body[data-loaded] .card-container {
+  animation: login-card-enter 220ms ease-out forwards;
 }
 
 h3 {
@@ -74,8 +81,64 @@ input[type="text"]:focus {
 }
 
 .error-slot {
-  min-height: 4.5rem;
   margin-top: 6px;
+}
+
+#setup-container,
+#login-container,
+#reset-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+#setup-container input,
+#login-container input,
+#reset-container input,
+#setup-container button,
+#login-container button,
+#reset-container button,
+#reset-container p,
+#login-container .forgot-btn {
+  margin: 0;
+}
+
+#reset-container .reset-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+#reset-container .reset-actions .btn-secondary {
+  flex: 1;
+}
+
+#reset-container .reset-actions .btn-primary {
+  flex: 1;
+  margin-left: auto;
+  background-color: #4d90fe;
+  border-color: #4d90fe;
+  color: #fff;
+}
+
+#reset-container .reset-actions .btn-primary:hover {
+  background-color: #3b7de6;
+  border-color: #3b7de6;
+  color: #fff;
+}
+
+#login-container .login-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+#login-container .login-actions button {
+  width: 100%;
+}
+
+#login-container .error-slot {
+  margin-top: 0;
 }
 
 .notification-content {
@@ -128,6 +191,30 @@ button {
   border-radius: 20px;
 }
 
+#login-container .btn-primary {
+  background-color: #4d90fe;
+  border-color: #4d90fe;
+  color: #fff;
+}
+
+#login-container .btn-primary:hover {
+  background-color: #3b7de6;
+  border-color: #3b7de6;
+  color: #fff;
+}
+
+#login-container .btn-secondary {
+  background-color: #f3f4f6;
+  color: #0f0f0f;
+  border: 1px solid #d1d5db;
+  border-radius: 20px;
+}
+
+#login-container .btn-secondary:hover {
+  background-color: #e5e7eb;
+  border-color: #cbd5e1;
+}
+
 .btn-primary:hover,
 .btn-success:hover,
 .btn-warning:hover {
@@ -167,6 +254,18 @@ button {
   animation: error-enter 180ms ease-out;
 }
 
+@keyframes login-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes error-enter {
   from {
     opacity: 0;
@@ -182,7 +281,7 @@ button {
 .current-word {
   font-weight: 500;
   font-size: 1rem;
-  margin-bottom: 10px;
+  margin: 0;
 }
 
 .screen-header,
@@ -190,7 +289,7 @@ button {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  margin-bottom: 15px;
+  margin-bottom: 0;
 }
 
 .screen-header h3,
@@ -216,15 +315,6 @@ button {
 
 .back-btn:hover {
   background-color: rgba(0, 0, 0, 0.06);
-}
-
-#login-container #back-from-login-btn {
-  position: fixed;
-  top: 12px;
-  left: 16px;
-  z-index: 20;
-  padding: 6px;
-  border-radius: 6px;
 }
 
 .hidden {
@@ -267,6 +357,29 @@ html[dark_mode="true"] .btn-warning {
   border: 1px solid #555;
   color: #e0e0e0;
   background-color: transparent;
+}
+
+html[dark_mode="true"] #login-container .btn-primary {
+  background-color: #4d90fe;
+  border-color: #4d90fe;
+  color: #fff;
+}
+
+html[dark_mode="true"] #login-container .btn-primary:hover {
+  background-color: #5b9cff;
+  border-color: #5b9cff;
+  color: #fff;
+}
+
+html[dark_mode="true"] #login-container .btn-secondary {
+  background-color: #3a3a3a;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+html[dark_mode="true"] #login-container .btn-secondary:hover {
+  background-color: #474747;
+  border-color: #666;
 }
 
 html[dark_mode="true"] .btn-primary:hover,

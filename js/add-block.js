@@ -75,10 +75,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Apply dark mode if needed
-  chrome.storage.local.get(['dark_mode'], (result) => {
-    if (result.dark_mode) {
+  // Keep theme in sync in case preference changes while this view is open.
+  const applyTheme = (themeSetting) => {
+    if (themeSetting === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (prefersDark) {
+        document.documentElement.setAttribute('dark_mode', 'true');
+      } else {
+        document.documentElement.removeAttribute('dark_mode');
+      }
+    } else if (themeSetting === 'dark') {
       document.documentElement.setAttribute('dark_mode', 'true');
+    } else {
+      document.documentElement.removeAttribute('dark_mode');
     }
+  };
+
+  chrome.storage.local.get(['themeSetting'], (result) => {
+    applyTheme(result.themeSetting || 'system');
   });
 });

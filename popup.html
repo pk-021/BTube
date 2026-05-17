@@ -6,10 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- Stylesheets -->
+  <script src="js/theme-init.js"></script>
   <link rel="stylesheet" href="css/popup.css" />
+  <link rel="stylesheet" href="css/login-overlay.css" />
   
   <!-- Scripts (non-module scripts can go here) -->
   <script src="js/popup.js" defer></script>
+  <script src="js/login.js" defer></script>
 </head>
 <body>
   <div id="popup">
@@ -266,12 +269,60 @@
   <!-- Login Overlay -->
   <div id="login-overlay" class="overlay login-overlay" hidden>
     <div class="overlay-content login-overlay-content">
-      <iframe
-        id="login-frame"
-        class="login-frame"
-        title="Unlock Extension"
-        src="about:blank"
-      ></iframe>
+      <div id="custom-notification" class="custom-notification hidden">
+        <div class="notification-content">
+          <h3>BetterTube</h3>
+          <p id="notification-message"></p>
+          <button id="notification-close" class="btn-primary">OK</button>
+        </div>
+      </div>
+
+      <div class="card-container">
+        <div id="setup-container" class="hidden">
+          <div class="screen-header">
+            <button type="button" id="back-from-setup-btn" class="back-btn" aria-label="Back to popup">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <h3>Set Password</h3>
+          </div>
+          <input type="password" id="new-password" placeholder="Enter password" />
+          <input type="password" id="confirm-password" placeholder="Confirm password" />
+          <button id="save-password" class="btn-success">Save Password</button>
+          <div class="error-slot">
+            <p id="setup-error" class="text-danger hidden">Passwords do not match!</p>
+          </div>
+        </div>
+
+        <div id="login-container" class="hidden">
+          <div class="screen-header">
+            <h3>Vefrification</h3>
+          </div>
+          <input type="password" id="password-input" placeholder="Password" />
+          <div class="login-actions">
+            <button id="cancel-login" type="button" class="btn-secondary">Cancel</button>
+            <button id="submit-password" class="btn-primary">Verify</button>
+          </div>
+          <button id="forgot-password" class="forgot-btn">Forgot Password?</button>
+          <div class="error-slot">
+            <p id="error-message" class="text-danger hidden">Incorrect password!</p>
+          </div>
+        </div>
+
+        <div id="reset-container" class="hidden">
+          <div class="reset-header">
+            <h3>Reset Password</h3>
+          </div>
+          <p>Type the following word:</p>
+          <div id="current-word" class="current-word"></div>
+          <input type="text" id="reset-input" placeholder="Type the word here" />
+          <div class="reset-actions">
+            <button id="cancel-reset" type="button" class="btn-secondary">Cancel</button>
+            <button id="reset-next" class="btn-primary">Next</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </body>

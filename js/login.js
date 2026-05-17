@@ -1,5 +1,7 @@
 "use strict";
 
+(function () {
+
 // --- Containers ---
 const loginContainer = document.getElementById("login-container");
 const setupContainer = document.getElementById("setup-container");
@@ -8,9 +10,9 @@ const resetContainer = document.getElementById("reset-container");
 // --- Login elements ---
 const input = document.getElementById("password-input");
 const button = document.getElementById("submit-password");
+const cancelButton = document.getElementById("cancel-login");
 const error = document.getElementById("error-message");
 const forgotButton = document.getElementById("forgot-password");
-const backFromLoginBtn = document.getElementById("back-from-login-btn");
 
 // --- Setup elements ---
 const newPasswordInput = document.getElementById("new-password");
@@ -23,12 +25,13 @@ const backFromSetupBtn = document.getElementById("back-from-setup-btn");
 const customNotification = document.getElementById("custom-notification");
 const notificationMessage = document.getElementById("notification-message");
 const notificationCloseButton = document.getElementById("notification-close");
+const loginOverlayEl = document.getElementById("login-overlay");
 
 // --- Reset elements ---
 const currentWordEl = document.getElementById("current-word");
 const resetInput = document.getElementById("reset-input");
 const resetNextBtn = document.getElementById("reset-next");
-const backFromResetBtn = document.getElementById("back-from-reset-btn");
+const cancelResetBtn = document.getElementById("cancel-reset");
 
 // --- Reset words ---
 const resetWords = [
@@ -44,13 +47,18 @@ const resetWords = [
   "dragon",
 ];
 let currentResetIndex = 0;
-let resetReturnContainer = loginContainer;
 // Persist the immediately previous page so all back buttons go there
 const URL_FROM_PARAM = new URLSearchParams(window.location.search).get("from");
 const IS_EMBEDDED_LOGIN = new URLSearchParams(window.location.search).get('embedded') === '1';
+const LOGIN_SESSION = new URLSearchParams(window.location.search).get('session');
 const SAVED_PREV_KEY = 'btube_prev_page';
 
 function notifyParent(type, detail = {}) {
+  if (window.BTubeLoginHost && typeof window.BTubeLoginHost[type] === 'function') {
+    window.BTubeLoginHost[type](detail);
+    return true;
+  }
+
   if (!IS_EMBEDDED_LOGIN || window.parent === window) {
     return false;
   }
@@ -59,6 +67,7 @@ function notifyParent(type, detail = {}) {
     window.parent.postMessage({
       source: 'btube-login-overlay',
       type,
+      session: LOGIN_SESSION || null,
       detail
     }, window.location.origin);
     return true;
@@ -191,36 +200,22 @@ function showContainer(container) {
 }
 
 function goBackToPreviousPage() {
+  if (window.BTubeLoginHost && typeof window.BTubeLoginHost.close === 'function') {
+    window.BTubeLoginHost.close();
+    return;
+  }
+
   if (notifyParent('close')) {
     return;
   }
 
   const saved = getSavedPreviousPage();
-  const current = window.location.href;
   let target;
   try {
     target = new URL(saved, window.location.href).href;
   } catch (e) {
     target = new URL('popup.html', window.location.href).href;
   }
-  // If a saved target exists, prefer navigating to it; try history.back() first
-  if (window.history.length > 1) {
-    try {
-      window.history.back();
-    } catch (e) {
-      // ignore
-    }
-
-    // After a short delay, if we're not at the saved target, force navigation to it
-    setTimeout(() => {
-      if (window.location.href !== target) {
-        window.location.href = target;
-      }
-    }, 250);
-    return;
-  }
-
-  // No history — go directly to saved target
   if (target && target !== window.location.href) {
     window.location.href = target;
     return;
@@ -252,24 +247,6 @@ function getPassword() {
 }
 
 // --- Get dark mode preference ---
-function applyDarkMode() {
-  chrome.storage.local.get("themeSetting", (data) => {
-    const themeSetting = data.themeSetting || 'system';
-    if (themeSetting === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (prefersDark) {
-        document.documentElement.setAttribute("dark_mode", "true");
-      } else {
-        document.documentElement.removeAttribute("dark_mode");
-      }
-    } else if (themeSetting === 'dark') {
-      document.documentElement.setAttribute("dark_mode", "true");
-    } else if (themeSetting === 'light') {
-      document.documentElement.removeAttribute("dark_mode");
-    }
-  });
-}
-
 // --- Password strength check ---
 function isStrongPassword(password) {
   // Minimum 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
@@ -281,7 +258,6 @@ function isStrongPassword(password) {
 async function init() {
   // Persist the immediately previous page for unified back navigation
   savePreviousPage();
-  applyDarkMode(); // Apply dark mode on load
 
   const password = await getPassword();
   if (password) {
@@ -413,32 +389,42 @@ input.addEventListener("keypress", (e) => {
   if (e.key === "Enter") checkPassword();
 });
 
-if (backFromLoginBtn) {
-  backFromLoginBtn.addEventListener("click", goBackToPreviousPage);
+if (cancelButton) {
+  cancelButton.addEventListener("click", goBackToPreviousPage);
 }
 
 document.addEventListener("click", (event) => {
   if (!document.body.contains(loginContainer)) return;
-  if (!loginContainer || loginContainer.classList.contains("hidden")) return;
+  if (loginOverlayEl && loginOverlayEl.hidden) return;
+  const loginVisible = loginContainer && !loginContainer.classList.contains("hidden");
+  const resetVisible = resetContainer && !resetContainer.classList.contains("hidden");
+  if (!loginVisible && !resetVisible) return;
   if (!isClickOutsideCard(event.target)) return;
   if (!customNotification.classList.contains("hidden")) return;
+
+  if (resetVisible) {
+    currentResetIndex = 0;
+    resetInput.value = "";
+    showContainer(loginContainer);
+    return;
+  }
+
   goBackToPreviousPage();
 });
 
 // --- Forgot password ---
 forgotButton.addEventListener("click", () => {
-  resetReturnContainer = loginContainer;
   currentResetIndex = 0;
   resetInput.value = "";
   showCurrentWord();
   showContainer(resetContainer);
 });
 
-if (backFromResetBtn) {
-  backFromResetBtn.addEventListener("click", () => {
+if (cancelResetBtn) {
+  cancelResetBtn.addEventListener("click", () => {
     currentResetIndex = 0;
     resetInput.value = "";
-    goBackToPreviousPage();
+    showContainer(loginContainer);
   });
 }
 
@@ -517,7 +503,7 @@ function showNotification(message, targetContainer = loginContainer, useBrowserN
       showContainer(targetContainer);
       notificationCloseButton.removeEventListener("click", closeHandler);
     }, 300);
-  });
+  }, { once: true });
 }
 
 // --- Initialize on DOM load ---
@@ -527,3 +513,42 @@ window.addEventListener("DOMContentLoaded", () => {
     document.body.setAttribute("data-loaded", "true");
   }, 50); // 50ms is usually enough
 });
+
+// Notify parent when embedded login is ready to be shown (prevents iframe flash)
+window.addEventListener("DOMContentLoaded", () => {
+  setTimeout(() => {
+    if (window.BTubeLoginHost) {
+      return;
+    }
+
+    const root = document.documentElement;
+    const emitReady = () => {
+      try {
+        notifyParent('ready');
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    if (root.getAttribute('data-theme-ready') === 'true') {
+      emitReady();
+      return;
+    }
+
+    const observer = new MutationObserver(() => {
+      if (root.getAttribute('data-theme-ready') === 'true') {
+        observer.disconnect();
+        emitReady();
+      }
+    });
+
+    observer.observe(root, { attributes: true, attributeFilter: ['data-theme-ready'] });
+
+    setTimeout(() => {
+      observer.disconnect();
+      emitReady();
+    }, 500);
+  }, 0);
+});
+
+})();

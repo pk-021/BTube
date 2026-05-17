@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Unlock Extension</title>
+    <script src="js/theme-init.js"></script>
     <link rel="stylesheet" href="css/login.css" />
   </head>
   <body>
@@ -44,15 +45,13 @@
       <!-- Login form -->
       <div id="login-container" class="hidden">
         <div class="screen-header">
-          <button type="button" id="back-from-login-btn" class="back-btn" aria-label="Back to popup">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <h3>Enter Password</h3>
+          <h3>Vefrification</h3>
         </div>
         <input type="password" id="password-input" placeholder="Password" />
-        <button id="submit-password" class="btn-primary">Unlock</button>
+        <div class="login-actions">
+          <button id="cancel-login" type="button" class="btn-secondary">Cancel</button>
+          <button id="submit-password" class="btn-primary">Verify</button>
+        </div>
         <button id="forgot-password" class="forgot-btn">
           Forgot Password?
         </button>
@@ -64,17 +63,15 @@
       <!-- Password reset form -->
       <div id="reset-container" class="hidden">
         <div class="reset-header">
-          <button type="button" id="back-from-reset-btn" class="back-btn" aria-label="Back to password entry">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
           <h3>Reset Password</h3>
         </div>
         <p>Type the following word:</p>
         <div id="current-word" class="current-word"></div>
         <input type="text" id="reset-input" placeholder="Type the word here" />
-        <button id="reset-next" class="btn-warning">Next</button>
+        <div class="reset-actions">
+          <button id="cancel-reset" type="button" class="btn-secondary">Cancel</button>
+          <button id="reset-next" class="btn-primary">Next</button>
+        </div>
       </div>
     </div>
 
