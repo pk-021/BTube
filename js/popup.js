@@ -1156,12 +1156,6 @@ async function addBlockedWebsite(rawUrl) {
 
         // Re-render to show new item
         renderBlockedWebsites(pendingChanges.blockedWebsites);
-
-        safeRuntimeSendMessage({
-            type: 'showNotification',
-            message: 'Website blocked successfully!',
-            notificationType: 'success'
-        });
     } catch (error) {
         console.error('Error adding blocked website:', error);
         alert('Failed to block website. Please try again.');
